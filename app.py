@@ -466,307 +466,268 @@ HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bilance Converter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:       #0a0a0f;
-  --surface:  #111118;
-  --surface2: #18181f;
-  --surface3: #1e1e28;
-  --border:   rgba(255,255,255,0.07);
-  --border2:  rgba(255,255,255,0.12);
-  --text:     #f0f0f5;
-  --text2:    #9898a8;
-  --text3:    #55555f;
-  --accent:   #6366f1;
-  --accent2:  #818cf8;
-  --green:    #10b981;
-  --green-bg: rgba(16,185,129,0.1);
-  --red:      #f43f5e;
-  --amber:    #f59e0b;
-  --amber-bg: rgba(245,158,11,0.1);
-  --radius:   12px;
-  --radius-lg:16px;
-  --font:     'Inter', sans-serif;
-  --mono:     'JetBrains Mono', monospace;
+  --bg:        #f8f7f4;
+  --surface:   #ffffff;
+  --surface2:  #f4f3f0;
+  --border:    #e8e6e1;
+  --border2:   #d4d1ca;
+  --text:      #1c1917;
+  --text2:     #6b6864;
+  --text3:     #a8a5a0;
+  --indigo:    #4f46e5;
+  --indigo-lt: #eef2ff;
+  --indigo-md: #c7d2fe;
+  --green:     #16a34a;
+  --green-lt:  #f0fdf4;
+  --green-md:  #bbf7d0;
+  --amber:     #d97706;
+  --amber-lt:  #fffbeb;
+  --red:       #dc2626;
+  --red-lt:    #fff1f2;
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow:    0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
+  --shadow-lg: 0 4px 6px rgba(0,0,0,.04), 0 12px 32px rgba(0,0,0,.07);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: var(--font);
+  font-family: 'Inter', -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  /* Subtle grid background */
-  background-image:
-    linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px);
-  background-size: 32px 32px;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Glow orb */
+/* Subtle noise texture on bg */
 body::before {
   content: '';
   position: fixed;
-  top: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%);
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 0;
 }
 
 .shell {
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
   position: relative;
   z-index: 1;
+}
+
+/* ── WORDMARK ── */
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+
+.wm-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wm-icon svg {
+  width: 16px; height: 16px;
+  stroke: white; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.wm-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.wm-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
 }
 
 /* ── CARD ── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 32px;
-  box-shadow:
-    0 0 0 1px rgba(99,102,241,0.05),
-    0 32px 64px rgba(0,0,0,0.4),
-    0 8px 16px rgba(0,0,0,0.3);
-  backdrop-filter: blur(20px);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: var(--shadow-lg);
 }
 
-/* ── HEADER ── */
-.header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 28px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.logo-wrap {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent), #4f46e5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 16px rgba(99,102,241,0.3);
-  flex-shrink: 0;
-}
-
-.logo-wrap svg {
-  width: 20px; height: 20px;
-  stroke: white; fill: none;
-  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
-}
-
-.header-text h2 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
-}
-
-.header-text p {
-  font-size: 12px;
-  color: var(--text3);
-  font-weight: 400;
-  margin-top: 1px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-/* ── SECTION LABEL ── */
+/* ── STEP HEADER ── */
 .step {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
-  margin-top: 22px;
+  margin-top: 20px;
+  margin-bottom: 9px;
 }
 
 .step:first-of-type { margin-top: 0; }
 
 .step-num {
-  width: 20px; height: 20px;
+  width: 18px; height: 18px;
   border-radius: 50%;
-  background: var(--surface3);
-  border: 1px solid var(--border2);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text3);
+  background: var(--text);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+  letter-spacing: 0;
 }
 
 .step-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text2);
-  letter-spacing: 0.04em;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-/* ── TIP GRID ── */
-.tip-grid {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 7px;
+/* ── SEGMENTED CONTROL (tip + obdobje) ── */
+.seg {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
   margin-bottom: 4px;
 }
 
-.tip-btn {
-  padding: 11px 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+.seg-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
   cursor: pointer;
   text-align: center;
-  transition: all .18s ease;
-  background: var(--surface2);
-  user-select: none;
+  transition: all .15s ease;
+  font-family: 'Inter', sans-serif;
 }
 
-.tip-btn:hover {
-  border-color: var(--border2);
-  background: var(--surface3);
+.seg-btn:hover { background: var(--border); }
+
+.seg-btn.selected {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border2);
 }
 
-.tip-btn.selected {
-  border-color: var(--accent);
-  background: rgba(99,102,241,0.12);
-  box-shadow: 0 0 0 1px rgba(99,102,241,0.2), inset 0 0 20px rgba(99,102,241,0.05);
-}
-
-.tip-code {
+.seg-code {
   display: block;
-  font-family: var(--mono);
-  font-size: 22px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
   font-weight: 500;
   color: var(--text2);
-  line-height: 1;
-  margin-bottom: 5px;
-  transition: color .18s;
-}
-
-.tip-btn.selected .tip-code { color: var(--accent2); }
-
-.tip-name {
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--text3);
-  letter-spacing: 0.03em;
-  transition: color .18s;
-}
-
-.tip-btn.selected .tip-name { color: var(--accent2); opacity: 0.8; }
-
-/* ── OBDOBJE GRID ── */
-.obdobje-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-  margin-bottom: 4px;
-}
-
-.obdobje-btn {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all .18s ease;
-  background: var(--surface2);
-  user-select: none;
-}
-
-.obdobje-btn:hover {
-  border-color: var(--border2);
-  background: var(--surface3);
-}
-
-.obdobje-btn.selected {
-  border-color: var(--accent);
-  background: rgba(99,102,241,0.12);
-  box-shadow: 0 0 0 1px rgba(99,102,241,0.2);
-}
-
-.obdobje-main {
-  display: block;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text2);
+  line-height: 1.1;
   margin-bottom: 3px;
-  transition: color .18s;
+  transition: color .15s;
 }
 
-.obdobje-sub {
+.seg-btn.selected .seg-code { color: var(--text); }
+
+.seg-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+  transition: color .15s;
+}
+
+.seg-btn.selected .seg-name { color: var(--text2); }
+
+/* Obdobje segmented */
+.seg-2 .seg-btn { padding: 10px 12px; text-align: left; }
+
+.seg-main {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text2);
+  margin-bottom: 2px;
+  transition: color .15s;
+}
+
+.seg-sub {
   display: block;
   font-size: 10.5px;
   color: var(--text3);
-  transition: color .18s;
+  transition: color .15s;
 }
 
-.obdobje-btn.selected .obdobje-main { color: var(--accent2); }
-.obdobje-btn.selected .obdobje-sub  { color: var(--accent2); opacity: 0.7; }
+.seg-2 .seg-btn.selected .seg-main { color: var(--text); }
+.seg-2 .seg-btn.selected .seg-sub  { color: var(--text2); }
 
 /* ── DROP ZONE ── */
 .drop-zone {
   border: 1.5px dashed var(--border2);
-  border-radius: var(--radius-lg);
-  padding: 28px 20px;
+  border-radius: var(--radius);
+  padding: 24px 20px;
   text-align: center;
   cursor: pointer;
   transition: all .2s ease;
   background: var(--surface2);
-  position: relative;
 }
 
 .drop-zone:hover, .drop-zone.drag {
-  border-color: var(--accent);
-  background: rgba(99,102,241,0.06);
+  border-color: var(--indigo);
+  background: var(--indigo-lt);
 }
 
 .drop-zone.has-file {
   border-color: var(--green);
   border-style: solid;
-  background: rgba(16,185,129,0.05);
+  background: var(--green-lt);
 }
 
 .drop-icon {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  background: var(--surface3);
-  border: 1px solid var(--border2);
+  width: 38px; height: 38px;
+  border-radius: 9px;
+  background: var(--border);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 12px;
+  margin: 0 auto 10px;
   transition: all .2s;
 }
 
 .drop-zone:hover .drop-icon, .drop-zone.drag .drop-icon {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+  background: var(--indigo);
 }
 
 .drop-zone.has-file .drop-icon {
   background: var(--green);
-  border-color: var(--green);
-  box-shadow: 0 4px 16px rgba(16,185,129,0.3);
 }
 
 .drop-icon svg {
-  width: 18px; height: 18px;
+  width: 17px; height: 17px;
   stroke: var(--text3); fill: none;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   transition: stroke .2s;
@@ -778,82 +739,76 @@ body::before {
 
 .drop-title {
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
   margin-bottom: 3px;
 }
 
-.drop-desc {
-  font-size: 12px;
-  color: var(--text3);
-  line-height: 1.5;
-}
+.drop-desc { font-size: 12px; color: var(--text3); }
 
 .drop-hint {
   font-size: 11.5px;
   color: var(--text3);
-  margin-top: 10px;
-  margin-bottom: 14px;
+  margin-top: 8px;
+  margin-bottom: 12px;
 }
 
 .drop-hint a {
-  color: var(--accent2);
+  color: var(--indigo);
   cursor: pointer;
   text-decoration: none;
+  font-weight: 500;
 }
 
 .drop-hint a:hover { text-decoration: underline; }
 
 .tags {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-top: 10px;
+  margin-top: 9px;
 }
 
 .tag {
-  padding: 2px 8px;
-  background: var(--surface3);
+  padding: 2px 7px;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
   font-size: 10.5px;
   color: var(--text3);
-  font-family: var(--mono);
+  font-family: 'JetBrains Mono', monospace;
 }
 
 input[type=file] { display: none; }
 
 /* ── FILE LIST ── */
-.file-list { margin-bottom: 16px; }
+.file-list { margin-bottom: 14px; }
 
 .file-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 9px;
+  padding: 8px 11px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 9px;
-  margin-bottom: 5px;
-  transition: border-color .15s;
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
 }
 
-.file-item:hover { border-color: var(--border2); }
-
 .file-item-icon {
-  width: 28px; height: 28px;
-  border-radius: 7px;
-  background: var(--green-bg);
-  border: 1px solid rgba(16,185,129,0.2);
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: var(--green-lt);
+  border: 1px solid var(--green-md);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 
 .file-item-icon svg {
-  width: 13px; height: 13px;
+  width: 12px; height: 12px;
   stroke: var(--green); fill: none;
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
 }
 
 .file-item-name {
@@ -867,14 +822,14 @@ input[type=file] { display: none; }
 }
 
 .file-item-size {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text3);
-  font-family: var(--mono);
+  font-family: 'JetBrains Mono', monospace;
   flex-shrink: 0;
 }
 
 .file-item-remove {
-  width: 22px; height: 22px;
+  width: 20px; height: 20px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: transparent;
@@ -884,77 +839,71 @@ input[type=file] { display: none; }
   transition: all .15s;
 }
 
-.file-item-remove:hover { background: rgba(244,63,94,0.15); border-color: var(--red); }
+.file-item-remove:hover { background: var(--red-lt); border-color: #fca5a5; }
 .file-item-remove:hover svg { stroke: var(--red); }
 
 .file-item-remove svg {
-  width: 11px; height: 11px;
+  width: 10px; height: 10px;
   stroke: var(--text3); fill: none;
   stroke-width: 2.5; stroke-linecap: round;
+}
+
+/* ── DIVIDER ── */
+.rule {
+  height: 1px;
+  background: var(--border);
+  margin: 22px 0;
 }
 
 /* ── BTN ── */
 .btn {
   width: 100%;
-  padding: 13px;
-  background: linear-gradient(135deg, var(--accent), #4f46e5);
+  padding: 12px;
+  background: var(--text);
   color: white;
   border: none;
-  border-radius: var(--radius);
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
   font-weight: 600;
-  font-family: var(--font);
+  font-family: 'Inter', sans-serif;
   cursor: pointer;
-  transition: all .2s ease;
+  transition: all .15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  box-shadow: 0 4px 20px rgba(99,102,241,0.25);
+  gap: 7px;
   letter-spacing: -0.01em;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 28px rgba(99,102,241,0.35);
-}
-
-.btn:active { transform: translateY(0); }
-
-.btn:disabled {
-  background: var(--surface3);
-  color: var(--text3);
-  box-shadow: none;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn:hover { background: #2d2b28; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.btn:active { transform: none; box-shadow: none; }
+.btn:disabled { background: var(--border2); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
 
 .btn svg {
-  width: 16px; height: 16px;
+  width: 15px; height: 15px;
   stroke: currentColor; fill: none;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
 .spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.2);
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,.25);
   border-top-color: white;
   border-radius: 50%;
-  animation: spin .7s linear infinite;
+  animation: spin .65s linear infinite;
   display: none;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── LOGIN ── */
-.login-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  margin-bottom: 7px;
-  display: block;
-  letter-spacing: 0.03em;
+.login-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
 }
 
 .login-title {
@@ -968,249 +917,254 @@ input[type=file] { display: none; }
 .login-sub {
   font-size: 13px;
   color: var(--text3);
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+  line-height: 1.5;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
 }
 
 input[type=password] {
   width: 100%;
-  padding: 11px 14px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  padding: 10px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
   font-size: 14px;
-  font-family: var(--font);
+  font-family: 'Inter', sans-serif;
   color: var(--text);
   outline: none;
   transition: all .15s;
   margin-bottom: 14px;
-  letter-spacing: 0.1em;
+  box-shadow: var(--shadow-sm);
 }
 
 input[type=password]:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px rgba(28,25,23,.08);
 }
 
-input[type=password]::placeholder { letter-spacing: 0.05em; color: var(--text3); }
-
-/* ── MSG ── */
+/* ── MESSAGES ── */
 .msg {
-  padding: 11px 14px;
-  border-radius: 9px;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
   font-size: 12.5px;
-  margin-top: 12px;
+  margin-top: 11px;
   border: 1px solid;
   display: none;
   line-height: 1.5;
 }
 
-.msg.error { background: rgba(244,63,94,0.08); border-color: rgba(244,63,94,0.25); color: #fb7185; }
+.msg.error { background: var(--red-lt); border-color: #fecaca; color: var(--red); }
 
 /* ── RESULT ── */
 .result-box {
   display: none;
-  margin-top: 16px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  margin-top: 14px;
+  border: 1px solid var(--green-md);
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .result-header {
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05));
-  border-bottom: 1px solid rgba(16,185,129,0.15);
+  padding: 11px 15px;
+  background: var(--green-lt);
+  border-bottom: 1px solid var(--green-md);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .result-header svg {
-  width: 15px; height: 15px;
+  width: 14px; height: 14px;
   stroke: var(--green); fill: none;
   stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
 }
 
-.result-header-text {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--green);
-}
+.result-header-text { font-size: 12.5px; font-weight: 600; color: var(--green); }
 
-.result-body { padding: 14px 16px; }
+.result-body { padding: 13px 15px; background: var(--surface); }
 
 .result-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
+  align-items: baseline;
+  padding: 5px 0;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
+  gap: 12px;
 }
 
 .result-row:last-child { border-bottom: none; }
-.result-label { color: var(--text3); }
-.result-val { font-weight: 500; font-family: var(--mono); font-size: 12px; color: var(--text); }
+.result-label { color: var(--text3); flex-shrink: 0; }
 
-.warn-note {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--amber);
-  background: var(--amber-bg);
-  border: 1px solid rgba(245,158,11,0.2);
-  border-radius: 8px;
-  padding: 9px 12px;
-  line-height: 1.5;
+.result-val {
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--text);
+  text-align: right;
+  word-break: break-all;
 }
 
-/* ── DIVIDER ── */
-.divider {
-  height: 1px;
-  background: var(--border);
-  margin: 22px 0;
+.warn-note {
+  margin-top: 11px;
+  font-size: 12px;
+  color: var(--amber);
+  background: var(--amber-lt);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  line-height: 1.5;
 }
 
 /* ── FOOTER ── */
 .footer {
+  margin-top: 16px;
   text-align: center;
   font-size: 11px;
   color: var(--text3);
-  margin-top: 20px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
-/* ── RESPONSIVE ── */
-@media (max-width: 520px) {
-  body { padding: 12px; align-items: flex-start; padding-top: 24px; }
-  .card { padding: 24px 20px; border-radius: 16px; }
-  .tip-grid { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 500px) {
+  body { padding: 16px; }
+  .card { padding: 22px 18px; }
 }
 </style>
 </head>
 <body>
 <div class="shell">
-<div class="card">
 
-  <div class="header">
-    <div class="logo-wrap">
+  <div class="wordmark">
+    <div class="wm-icon">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
       <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     </div>
-    <div class="header-text">
-      <h2>Bilance Converter</h2>
-      <p>Interni bančni tool</p>
+    <span class="wm-text">Bilance Converter</span>
+    <span class="wm-badge">Interno</span>
+  </div>
+
+  <div class="card">
+
+    <!-- LOGIN -->
+    <div id="login-section">
+      <div class="login-eyebrow">Banka &middot; Interni dostop</div>
+      <div class="login-title">Prijava</div>
+      <div class="login-sub">Vpišite geslo za dostop do orodja za pretvorbo bilanc.</div>
+      <label class="field-label">Geslo</label>
+      <input type="password" id="password" placeholder="Vpiši geslo" onkeydown="if(event.key==='Enter')login()">
+      <button class="btn" onclick="login()">
+        <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Prijava
+      </button>
+      <div class="msg error" id="login-error">Napačno geslo — poskusite znova.</div>
+    </div>
+
+    <!-- APP -->
+    <div id="app-section" style="display:none;">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-label">Tip bilance</div>
+      </div>
+      <div class="seg">
+        <button class="seg-btn" onclick="selectTip(this,'7')">
+          <span class="seg-code">7</span>
+          <span class="seg-name">Preliminarna</span>
+        </button>
+        <button class="seg-btn selected" onclick="selectTip(this,'8')">
+          <span class="seg-code">8</span>
+          <span class="seg-name">Zaključena</span>
+        </button>
+        <button class="seg-btn" onclick="selectTip(this,'3')">
+          <span class="seg-code">3</span>
+          <span class="seg-name">Revidirana</span>
+        </button>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-label">Poslovno obdobje</div>
+      </div>
+      <div class="seg seg-2">
+        <button class="seg-btn selected" onclick="selectObdobje(this,'01.01-31.12')">
+          <span class="seg-main">01.01. &#8211; 31.12.</span>
+          <span class="seg-sub">Standardno leto</span>
+        </button>
+        <button class="seg-btn" onclick="selectObdobje(this,'01.04-31.03')">
+          <span class="seg-main">01.04. &#8211; 31.03.</span>
+          <span class="seg-sub">Nestandardno leto</span>
+        </button>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-label">Datoteka(-e)</div>
+      </div>
+      <div class="drop-zone" id="drop-zone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="ev(event,'drag')" ondragleave="ev(event,'')" ondrop="drop(event)">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/>
+          <line x1="12" y1="12" x2="12" y2="21"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        </div>
+        <div class="drop-title">Povleci datoteko sem</div>
+        <div class="drop-desc">ali klikni za izbiro &mdash; PDF ali Excel</div>
+        <div class="tags">
+          <span class="tag">lp2025</span>
+          <span class="tag">JOLP</span>
+          <span class="tag">NAPOVED</span>
+          <span class="tag">xlsx</span>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.xlsx" multiple onchange="filesSelected(this.files)">
+      <div class="drop-hint">Za ločena BS + IPI &mdash; <a onclick="document.getElementById('file-input').click()">dodaj oba hkrati</a></div>
+
+      <div class="file-list" id="file-list"></div>
+
+      <button class="btn" id="convert-btn" onclick="convert()" disabled>
+        <div class="spinner" id="spinner"></div>
+        <svg id="btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span id="btn-text">Pretvori v Excel</span>
+      </button>
+
+      <div class="msg error" id="error-msg"></div>
+
+      <div class="result-box" id="result-box">
+        <div class="result-header">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span class="result-header-text">Pretvorba uspešna &mdash; prenos se začenja</span>
+        </div>
+        <div class="result-body">
+          <div class="result-row"><span class="result-label">Podjetje</span><span class="result-val" id="r-name"></span></div>
+          <div class="result-row"><span class="result-label">Matična</span><span class="result-val" id="r-reg"></span></div>
+          <div class="result-row"><span class="result-label">Obdobje</span><span class="result-val" id="r-period"></span></div>
+          <div class="result-row"><span class="result-label">Tip bilance</span><span class="result-val" id="r-tip"></span></div>
+          <div class="result-row"><span class="result-label">Format</span><span class="result-val" id="r-fmt"></span></div>
+          <div class="result-row"><span class="result-label">BS vrstice</span><span class="result-val" id="r-bs"></span></div>
+          <div class="result-row"><span class="result-label">IPI vrstice</span><span class="result-val" id="r-ipi"></span></div>
+          <div class="warn-note">&#9888; Ročno vnesi <strong>Št. partnerja</strong> (celica D5 v BS sheetu)</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- LOGIN -->
-  <div id="login-section">
-    <div class="login-title">Dobrodošli</div>
-    <div class="login-sub">Vpišite geslo za dostop</div>
-    <label class="login-label">Geslo</label>
-    <input type="password" id="password" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')login()">
-    <button class="btn" onclick="login()">
-      <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-      <polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-      Prijava
-    </button>
-    <div class="msg error" id="login-error">Napačno geslo — poskusite znova.</div>
-  </div>
-
-  <!-- APP -->
-  <div id="app-section" style="display:none;">
-
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-label">Tip bilance</div>
-    </div>
-    <div class="tip-grid">
-      <div class="tip-btn" onclick="selectTip(this,'7')">
-        <span class="tip-code">7</span>
-        <span class="tip-name">Preliminarna</span>
-      </div>
-      <div class="tip-btn selected" onclick="selectTip(this,'8')">
-        <span class="tip-code">8</span>
-        <span class="tip-name">Zaključena</span>
-      </div>
-      <div class="tip-btn" onclick="selectTip(this,'3')">
-        <span class="tip-code">3</span>
-        <span class="tip-name">Revidirana</span>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-label">Poslovno obdobje</div>
-    </div>
-    <div class="obdobje-grid">
-      <div class="obdobje-btn selected" onclick="selectObdobje(this,'01.01-31.12')">
-        <span class="obdobje-main">01.01. &#8211; 31.12.</span>
-        <span class="obdobje-sub">Standardno leto</span>
-      </div>
-      <div class="obdobje-btn" onclick="selectObdobje(this,'01.04-31.03')">
-        <span class="obdobje-main">01.04. &#8211; 31.03.</span>
-        <span class="obdobje-sub">Nestandardno leto</span>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-label">Datoteka(-e)</div>
-    </div>
-    <div class="drop-zone" id="drop-zone"
-         onclick="document.getElementById('file-input').click()"
-         ondragover="ev(event,'drag')" ondragleave="ev(event,'')" ondrop="drop(event)">
-      <div class="drop-icon">
-        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/>
-        <line x1="12" y1="12" x2="12" y2="21"/>
-        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-      </div>
-      <div class="drop-title">Povleci datoteko sem</div>
-      <div class="drop-desc">ali klikni za izbiro — PDF ali Excel</div>
-      <div class="tags">
-        <span class="tag">lp2025</span>
-        <span class="tag">JOLP</span>
-        <span class="tag">NAPOVED</span>
-        <span class="tag">xlsx</span>
-      </div>
-    </div>
-    <input type="file" id="file-input" accept=".pdf,.xlsx" multiple onchange="filesSelected(this.files)">
-    <div class="drop-hint">Za ločena BS + IPI fajla — <a onclick="document.getElementById('file-input').click()">dodaj oba hkrati</a></div>
-
-    <div class="file-list" id="file-list"></div>
-
-    <button class="btn" id="convert-btn" onclick="convert()" disabled>
-      <div class="spinner" id="spinner"></div>
-      <svg id="btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/>
-      <polyline points="1 20 1 14 7 14"/>
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      <span id="btn-text">Pretvori v Excel</span>
-    </button>
-
-    <div class="msg error" id="error-msg"></div>
-
-    <div class="result-box" id="result-box">
-      <div class="result-header">
-        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-        <polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span class="result-header-text">Pretvorba uspešna — prenos se začenja</span>
-      </div>
-      <div class="result-body">
-        <div class="result-row"><span class="result-label">Podjetje</span><span class="result-val" id="r-name"></span></div>
-        <div class="result-row"><span class="result-label">Matična</span><span class="result-val" id="r-reg"></span></div>
-        <div class="result-row"><span class="result-label">Obdobje</span><span class="result-val" id="r-period"></span></div>
-        <div class="result-row"><span class="result-label">Tip bilance</span><span class="result-val" id="r-tip"></span></div>
-        <div class="result-row"><span class="result-label">Format vhoda</span><span class="result-val" id="r-fmt"></span></div>
-        <div class="result-row"><span class="result-label">BS vrstice</span><span class="result-val" id="r-bs"></span></div>
-        <div class="result-row"><span class="result-label">IPI vrstice</span><span class="result-val" id="r-ipi"></span></div>
-        <div class="warn-note">⚠ Ročno vnesi <strong>Št. partnerja</strong> (celica D5 v BS sheetu)</div>
-      </div>
-    </div>
-
-  </div><!-- /app-section -->
-</div><!-- /card -->
-<div class="footer">Interni bančni tool &middot; Samo za pooblaščene uporabnike</div>
-</div><!-- /shell -->
+  <div class="footer">Samo za pooblaščene uporabnike &middot; Interno orodje</div>
+</div>
 
 <script>
 let selectedFiles = [];
@@ -1233,15 +1187,15 @@ function login() {
   });
 }
 
-function selectTip(el, val) {
-  selectedTip = val;
-  document.querySelectorAll('.tip-btn').forEach(b=>b.classList.remove('selected'));
+function selectTip(el,val){
+  selectedTip=val;
+  document.querySelectorAll('.seg:not(.seg-2) .seg-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected');
 }
 
-function selectObdobje(el, val) {
-  selectedObdobje = val;
-  document.querySelectorAll('.obdobje-btn').forEach(b=>b.classList.remove('selected'));
+function selectObdobje(el,val){
+  selectedObdobje=val;
+  document.querySelectorAll('.seg-2 .seg-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected');
 }
 
@@ -1288,7 +1242,7 @@ function renderFileList(){
         <polyline points="14 2 14 8 20 8"/></svg>
       </div>
       <span class="file-item-name" title="${f.name}">${f.name}</span>
-      <span class="file-item-size">${(f.size/1024/1024).toFixed(1)} MB</span>
+      <span class="file-item-size">${(f.size/1024/1024).toFixed(1)}&thinsp;MB</span>
       <button class="file-item-remove" onclick="removeFile(${i})">
         <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -1313,14 +1267,15 @@ async function convert(){
   document.getElementById('result-box').style.display='none';
   const fd=new FormData();
   for(let f of selectedFiles) fd.append('files',f);
-  fd.append('tip_bilance', selectedTip);
-  fd.append('obdobje', selectedObdobje);
+  fd.append('tip_bilance',selectedTip);
+  fd.append('obdobje',selectedObdobje);
   try{
     const res=await fetch('/convert',{method:'POST',body:fd});
     if(!res.ok){
       const err=await res.json().catch(()=>({error:'Neznana napaka.'}));
       showError(err.error||'Napaka pri pretvorbi.'); return;
     }
+    const downloadName=res.headers.get('X-Download-Name')||selectedFiles[0].name.replace(/\.(pdf|xlsx)$/i,'')+'_CBK.xlsx';
     const name=decodeURIComponent(res.headers.get('X-Company-Name')||'');
     const reg=res.headers.get('X-Registration')||'';
     const period=res.headers.get('X-Period')||'';
@@ -1339,8 +1294,7 @@ async function convert(){
     const blob=await res.blob();
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    const stem=selectedFiles[0].name.replace(/\.(pdf|xlsx)$/i,'');
-    a.href=url; a.download=stem+'_CBK.xlsx';
+    a.href=url; a.download=downloadName;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }catch(e){
     showError('Napaka: '+e.message);
@@ -1351,6 +1305,7 @@ async function convert(){
 </script>
 </body>
 </html>"""
+
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
@@ -1442,6 +1397,7 @@ def convert():
             download_name=download_name,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         safe_name = c.name.encode('ascii', errors='replace').decode('ascii')
+        response.headers["X-Download-Name"] = download_name
         response.headers["X-Company-Name"] = safe_name
         response.headers["X-Registration"] = c.registration_number
         response.headers["X-Period"]       = f"{c.period_from} - {c.period_to}"
@@ -1450,7 +1406,7 @@ def convert():
         response.headers["X-BS-Filled"]    = str(bs_n)
         response.headers["X-IPI-Filled"]   = str(ipi_n)
         response.headers["Access-Control-Expose-Headers"] = \
-            "X-Company-Name,X-Registration,X-Period,X-Tip-Bilance,X-PDF-Format,X-BS-Filled,X-IPI-Filled"
+            "X-Download-Name,X-Company-Name,X-Registration,X-Period,X-Tip-Bilance,X-PDF-Format,X-BS-Filled,X-IPI-Filled"
         return response
 
     except Exception as e:
