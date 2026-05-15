@@ -464,7 +464,7 @@ HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bilance Converter</title>
+<title>CBK Pretvornik</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -536,27 +536,33 @@ body::before {
   padding: 0 4px;
 }
 
-.wm-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.wm-logo {
+  flex-shrink: 0;
+  line-height: 0;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
 }
 
-.wm-icon svg {
-  width: 16px; height: 16px;
-  stroke: white; fill: none;
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+.wm-logo svg { width: 36px; height: 36px; display: block; }
+
+.wm-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .wm-text {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.wm-sub {
+  font-size: 10.5px;
+  color: var(--text3);
+  font-weight: 400;
+  letter-spacing: 0.02em;
 }
 
 .wm-badge {
@@ -569,6 +575,7 @@ body::before {
   padding: 2px 8px;
   border-radius: 20px;
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 /* ── CARD ── */
@@ -1044,11 +1051,25 @@ input[type=password]:focus {
 <div class="shell">
 
   <div class="wordmark">
-    <div class="wm-icon">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <div class="wm-logo">
+      <!-- CBK logo mark: stylized chart bars with upward arrow -->
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background -->
+        <rect width="36" height="36" rx="9" fill="#1c1917"/>
+        <!-- Bar 1 -->
+        <rect x="7" y="20" width="5" height="9" rx="1.5" fill="white" opacity="0.35"/>
+        <!-- Bar 2 -->
+        <rect x="15.5" y="14" width="5" height="15" rx="1.5" fill="white" opacity="0.65"/>
+        <!-- Bar 3 (tallest) -->
+        <rect x="24" y="8" width="5" height="21" rx="1.5" fill="white"/>
+        <!-- Upward tick on bar 3 -->
+        <path d="M25 11 L26.5 8.5 L28 11" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
     </div>
-    <span class="wm-text">Bilance Converter</span>
+    <div class="wm-name">
+      <span class="wm-text">CBK Pretvornik</span>
+      <span class="wm-sub">Analiza bilanc</span>
+    </div>
     <span class="wm-badge">Interno</span>
   </div>
 
@@ -1056,7 +1077,7 @@ input[type=password]:focus {
 
     <!-- LOGIN -->
     <div id="login-section">
-      <div class="login-eyebrow">Banka &middot; Interni dostop</div>
+      <div class="login-eyebrow">CBK Pretvornik &middot; Interni dostop</div>
       <div class="login-title">Prijava</div>
       <div class="login-sub">Vpišite geslo za dostop do orodja za pretvorbo bilanc.</div>
       <label class="field-label">Geslo</label>
@@ -1163,7 +1184,7 @@ input[type=password]:focus {
     </div>
   </div>
 
-  <div class="footer">Samo za pooblaščene uporabnike &middot; Interno orodje</div>
+  <div class="footer">CBK Pretvornik &middot; Samo za pooblaščene uporabnike</div>
 </div>
 
 <script>
