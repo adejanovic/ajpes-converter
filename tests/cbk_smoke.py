@@ -27,6 +27,6 @@ ws = ov["BS"]
 vals = (ws["D3"].value, str(ws["D4"].value), ws["D5"].value)
 if vals != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", 123456):
     print("CBK: D3 do D5 narobe:", vals); sys.exit(1)
-if ov["IPI"]["D5"].value != "=+BS!D5":
-    print("CBK: IPI D5 ni povezan z BS"); sys.exit(1)
+if (ov["IPI"]["D3"].value, str(ov["IPI"]["D4"].value), ov["IPI"]["D5"].value) != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", 123456):
+    print("CBK: IPI D3 do D5 niso vpisani neposredno"); sys.exit(1)
 print("CBK: VSE V REDU")

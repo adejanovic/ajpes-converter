@@ -5832,6 +5832,8 @@ def export_excel(result, output_path):
     ws2 = wb["IPI"]
     ws2.cell(3,4).value = c.name
     ws2.cell(4,4).value = str(c.registration_number or "")
+    if getattr(c, "partner", ""):  # neposredno, ne formula: v zaščitenem pogledu Excela formule nimajo vrednosti
+        ws2.cell(5,4).value = int(c.partner) if str(c.partner).isdigit() else str(c.partner)
     if c.period_from and c.period_to:
         ws2.cell(8,3).value = f"{c.period_from} - {c.period_to}"
     ws2.cell(11,4).value = _to_excel_date(c.period_to)
