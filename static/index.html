@@ -2618,7 +2618,7 @@ body.mode-cbk #newBtn{display:inline-flex!important}
     for (const id of ['coNaziv', 'coMat', 'coPart']) $('#' + id).addEventListener('input', e => { e.target.dataset.auto = ''; e.target.classList.remove('is-auto'); coMsg(); });
     const cdz = $('#coDz'), cfi = $('#coFile');
     $('#coPick').onclick = e => { e.stopPropagation(); cfi.click(); };
-    cdz.addEventListener('click', () => cfi.click());
+    cdz.addEventListener('click', e => { if (!e.target.closest('#coPick')) cdz.focus(); }); /* klik na polje samo označi polje (Ctrl+V); datoteko odpre gumb */
     cdz.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cfi.click(); } });
     cfi.onchange = () => { [...cfi.files].forEach(f => enqueue(f)); cfi.value = ''; };
     ['dragenter', 'dragover'].forEach(ev => cdz.addEventListener(ev, e => { e.preventDefault(); cdz.classList.add('over'); }));
