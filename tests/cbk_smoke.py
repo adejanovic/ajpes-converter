@@ -22,10 +22,10 @@ if diff:
 print("CBK: bilanca brez podatkov podjetja: enako pričakovanemu")
 
 # podatki podjetja iz obrazca (CRMB / AJPES / HIBIS) pridejo v D3, D4, D5
-ov = openpyxl.load_workbook(io.BytesIO(convert((("naziv", "ČŠŽ Testno podjetje d.o.o."), ("maticna", "1234567000"), ("partner", "f123456")))))
+ov = openpyxl.load_workbook(io.BytesIO(convert((("naziv", "ČŠŽ Testno podjetje d.o.o."), ("maticna", "1234567000"), ("partner", "F123456")))))
 ws = ov["BS"]
 vals = (ws["D3"].value, str(ws["D4"].value), ws["D5"].value)
-if vals != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", "F123456"):
+if vals != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", 123456):
     print("CBK: D3 do D5 narobe:", vals); sys.exit(1)
 if ov["IPI"]["D5"].value != "=+BS!D5":
     print("CBK: IPI D5 ni povezan z BS"); sys.exit(1)

@@ -929,7 +929,7 @@ body.mode-cbk #newBtn{display:inline-flex!important}
           <div class="cbk-co">
             <label class="cbk-f wide"><span>Naziv podjetja</span><input id="coNaziv" type="text" autocomplete="off" spellcheck="false"></label>
             <label class="cbk-f"><span>Matična številka</span><input id="coMat" type="text" inputmode="numeric" autocomplete="off"></label>
-            <label class="cbk-f"><span>Št. partnerja</span><input id="coPart" type="text" autocomplete="off" spellcheck="false" placeholder="npr. F123456"></label>
+            <label class="cbk-f"><span>Št. partnerja</span><input id="coPart" type="text" autocomplete="off" spellcheck="false" placeholder="npr. 123456" inputmode="numeric"></label>
           </div>
           <p class="cbk-cm" id="coMsg" role="status" aria-live="polite" hidden></p>
         </div>
@@ -2591,7 +2591,7 @@ body.mode-cbk #newBtn{display:inline-flex!important}
     if (!M || !cbkReady) return;
     try { normSifre(); } catch (e) {}
     const k = M.komitent;
-    coSet('coNaziv', k.naziv); coSet('coMat', String(k.maticna || '').replace(/\D/g, '')); coSet('coPart', k.sifra);
+    coSet('coNaziv', k.naziv); coSet('coMat', String(k.maticna || '').replace(/\D/g, '')); coSet('coPart', String(k.sifra || '').replace(/\D/g, ''));
     if (!cbkSubjTouched && !cbkFiles.length) { const sp = /^S\d{6}$/.test(k.sifra || '') || /\bs\.\s*p\.?\s*$/i.test(k.naziv || ''); $('#cbkSubj').value = sp ? '2' : '1'; }
     coMsg();
   }
@@ -2650,7 +2650,7 @@ body.mode-cbk #newBtn{display:inline-flex!important}
     const tip = $('#cbkTip').value;
     const fd = new FormData(); cbkFiles.forEach(f => fd.append('files', f));
     fd.append('tip_bilance', tip); fd.append('tip_subjekta', $('#cbkSubj').value); fd.append('obdobje', cbkOb);
-    fd.append('naziv', $('#coNaziv').value.trim()); fd.append('maticna', $('#coMat').value.trim()); fd.append('partner', $('#coPart').value.trim());
+    fd.append('naziv', $('#coNaziv').value.trim()); fd.append('maticna', $('#coMat').value.trim()); fd.append('partner', $('#coPart').value.replace(/\D/g, ''));
     if (tip === '7') fd.append('medletni_datum', $('#cbkLeto').value + '-' + $('#cbkMes').value);
     go.disabled = true; go.classList.add('is-load'); st.textContent = 'Pretvarjam … skenirani PDF lahko traja do minute.'; res.hidden = true;
     try {

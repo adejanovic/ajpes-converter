@@ -5796,7 +5796,7 @@ def export_excel(result, output_path):
     # Matična mora ostati tekst, da se ohranijo vodilne ničle.
     ws.cell(4,4).value  = str(c.registration_number or "")
     if getattr(c, "partner", ""):
-        ws.cell(5,4).value = str(c.partner)
+        ws.cell(5,4).value = int(c.partner) if str(c.partner).isdigit() else str(c.partner)
     ws.cell(6,4).value  = c.obdobje_bilance
     # Šifre morajo biti numerične, ne tekstovne.
     ws.cell(5,7).value  = _as_int_or_original(c.tip_bilance)
@@ -5890,7 +5890,7 @@ def convert():
     tip_override = request.form.get("tip_bilance", "")
     ov_name    = re.sub(r"\s+", " ", request.form.get("naziv", "")).strip()
     ov_mat     = re.sub(r"\D", "", request.form.get("maticna", ""))
-    ov_partner = re.sub(r"\s+", "", request.form.get("partner", "")).upper()
+    ov_partner = re.sub(r"\D", "", request.form.get("partner", ""))  # HIBIS pozna samo številko, brez črke (F, P, S)
     tip_subjekta_override = request.form.get("tip_subjekta", "1")
     medletni_datum_raw = request.form.get("medletni_datum", "").strip()  # format 'YYYY-MM', samo za tip_bilance == '7'
     conv_id = str(uuid.uuid4())

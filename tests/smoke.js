@@ -27,7 +27,7 @@ const paste = (page, text) => page.evaluate(t => { const dt = new DataTransfer()
   ok((await page.inputValue('#coNaziv')).includes('TESTNO PODJETJE'), 'naziv podjetja');
   ok((await page.inputValue('#coMat')) === '1234567000', 'matična številka');
   ok((await page.textContent('#coMsg')).includes('št. partnerja'), 'opozorilo, da št. partnerja manjka');
-  await page.fill('#coPart', 'f123456');
+  await page.fill('#coPart', '123456');
 
   console.log('3. Pretvorba bilance');
   await page.setInputFiles('#cbkFile', BIL);
@@ -37,7 +37,7 @@ const paste = (page, text) => page.evaluate(t => { const dt = new DataTransfer()
   await page.waitForTimeout(500);
   ok(await page.locator('#cbkRes').isVisible(), 'prikazan je povzetek pretvorbe');
   const py = require('child_process').spawnSync('python3', ['-c', `import openpyxl,sys;w=openpyxl.load_workbook(sys.argv[1])['BS'];print(w['D3'].value+'|'+str(w['D4'].value)+'|'+str(w['D5'].value))`, out]).stdout.toString().trim();
-  ok(py === 'TESTNO PODJETJE, trgovina in storitve, d.o.o.|1234567000|F123456', 'Excel: D3, D4, D5 (' + py + ')');
+  ok(py === 'TESTNO PODJETJE, trgovina in storitve, d.o.o.|1234567000|123456', 'Excel: D3, D4, D5 (' + py + ')');
 
   console.log('4. Napake v brskalniku');
   ok(errs.length === 0, 'brez napak v konzoli' + (errs.length ? ': ' + errs.join(' | ') : ''));
