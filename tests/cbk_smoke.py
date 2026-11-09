@@ -30,3 +30,29 @@ if vals != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", 123456):
 if (ov["IPI"]["D3"].value, str(ov["IPI"]["D4"].value), ov["IPI"]["D5"].value) != ("ČŠŽ Testno podjetje d.o.o.", "1234567000", 123456):
     print("CBK: IPI D3 do D5 niso vpisani neposredno"); sys.exit(1)
 print("CBK: VSE V REDU")
+
+# DENAR | OBRAČUNI (VIZIJA): postavke z drugačnim besedilom kot uradni AOP nazivi se morajo ujeti
+sys.path.insert(0, str(T.parent))
+from cbk import pretvornik as P
+cases = [
+    (True, "F. KOSMATI DONOS IZ POSLOVANJA", None, ("126", False)),
+    (True, "B. SPREMEMBA VREDNOSTI ZALOG PROIZVODOV IN NEDOKONČANE", None, ("121", True)),
+    (True, "D. SUBVENCIJE, DOTACIJE, REGRESI, KOMPENZACIJE IN DRUGI PRIHODKI,", None, ("124", False)),
+    (True, "c) povračila stroškov zaposlencem v zvezi z delom", None, ("137", False)),
+    (True, "3. Prevrednotovalni poslovni odhodki pri obrat. sr.", None, ("147", False)),
+    (True, "K. FINAČNI ODHODKI", None, ("166", False)),
+    (True, "II. Finačni odhodki iz finančnih obveznosti", None, ("169", False)),
+    (True, "III. Finačni odhodki iz poslovnih obveznosti", None, ("174", False)),
+    (True, "II. Drugi finančni prihodki in ostali prihodki", None, ("180", False)),
+    (True, "P. DAVEK IZ DOBIČKA", None, ("184", False)),
+    (True, "1. Čisti prihodki od prodaje proizvodov in storitev", "eu", ("116", False)),
+    (True, "1. Čisti prihodki od prodaje proizvodov in storitev", "izven_eu", ("119", False)),
+    (False, "4. Druge naprave in oprema, drobni inventar in druga opredmetena osnovna", None, ("014", False)),
+    (False, "IV. Presežek iz prevrednotenja", None, ("301", False)),
+    (False, "Zabilančna sredstva", None, ("054", False)),
+    (False, "Zabilančne obveznosti", None, ("096", False)),
+]
+bad = [(c[1], P._vizija_alias(c[1], c[2], c[0])) for c in cases if P._vizija_alias(c[1], c[2], c[0]) != c[3]]
+if bad:
+    print("CBK: VIZIJA aliasi narobe:", bad); sys.exit(1)
+print("CBK: VIZIJA aliasi v redu")

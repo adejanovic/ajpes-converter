@@ -5146,6 +5146,42 @@ def parse_vizija_razlika_format(pages_text, tip_override=None, tip_subjekta_over
     return validate(result)
 
 
+# Izvoz DENAR | OBRAČUNI ima svoja besedila postavk (tipkarske napake in okrajšave izvornega programa,
+# prelomljene vrstice), ki se ne ujemajo z uradnimi nazivi AOP. Zato za neujete postavke:
+# 1) alias iz tabel za DENAR OBRAČUNI, 2) ujemanje z začetkom uradnega naziva (prelomljena vrstica),
+# 3) razrešitev po kontekstu (isto besedilo za domači trg, EU, izven EU).
+_VIZIJA_ALIAS_IU = dict(_OBRACUNI_DIRECT_IU)
+_VIZIJA_ALIAS_BS = dict(_OBRACUNI_DIRECT_BS)
+_VIZIJA_ALIAS_BS["iv. presežek iz prevrednotenja"] = "301"  # kot v preteklih letih: Rezerve, nastale zaradi vrednotenja po pošteni vrednosti
+_VIZIJA_ALIAS_IU.update({
+    "f. kosmati donos iz poslovanja": "126",
+    "d. subvencije, dotacije, regresi, kompenzacije in drugi prihodki": "124",
+    "d. subvencije, dotacije, regresi, kompenzacije in drugi prihodki, ki so povezani s poslovnimi učinki": "124",
+    "ii. drugi finančni prihodki in ostali prihodki": "180",
+})
+_VIZIJA_ZALOGE_KEYS = ("b. sprememba vrednosti zalog proizvodov in nedokončane", "b. sprememba vrednosti zalog proizvodov in nedokončane proizvodnje")
+
+def _vizija_alias(label, ctx, is_ipi):
+    """Vrne (aop, zaloge). zaloge=True: postavka »B. Sprememba vrednosti zalog«, kodo (121/122) določi predznak."""
+    key = re.sub(r"\s+", " ", str(label).strip()).lower().rstrip(" ,")
+    if is_ipi and key in _VIZIJA_ZALOGE_KEYS:
+        return "121", True
+    table = _VIZIJA_ALIAS_IU if is_ipi else _VIZIJA_ALIAS_BS
+    if key in table:
+        return table[key], False
+    if is_ipi:
+        hit = _match_obracuni_label(label, {}, _OBRACUNI_AMBIGUOUS_IU, ctx)
+        if hit:
+            return hit, False
+    if len(key) >= 25:  # prelomljena vrstica: začetek uradnega naziva
+        pool = {**_JOLP_TO_AOP_CI, **table}
+        cands = {v for k, v in pool.items() if k.startswith(key)}
+        cands &= (IPI_AOP if is_ipi else BS_AOP)
+        if len(cands) == 1:
+            return cands.pop(), False
+    return None, False
+
+
 def parse_vizija_format(pages_text, tip_override=None, tip_subjekta_override=None):
     result = ParseResult(pdf_format="VIZIJA")
     full = "\n".join(pages_text)
@@ -5173,12 +5209,25 @@ def parse_vizija_format(pages_text, tip_override=None, tip_subjekta_override=Non
     for page_text in pages_text:
         _vizija_parse_page_lines(page_text, entries)
 
+    ctx = None  # prodajni blok (domači trg / EU / izven EU) za postavke "1. Čisti prihodki od prodaje proizvodov in storitev"
     for label, val in entries:
         if val is None:
             continue
         aop = _match_aop_label_exact(label)
+        if aop in _OBRACUNI_TRIGGERS_IU and is_ipi:
+            ctx = _OBRACUNI_TRIGGERS_IU[aop]
+        zaloge = False
+        if not aop:
+            aop, zaloge = _vizija_alias(label, ctx, is_ipi)
         if not aop or aop in result.aop_data:
             continue
+        if zaloge:  # "B. Sprememba vrednosti zalog": pozitivno = povečanje (121), negativno = zmanjšanje (122, v pozitivnem znesku)
+            _n = parse_si(val)
+            if _n is None or _n == 0:
+                continue
+            aop, val = ("121", val) if _n > 0 else ("122", str(val).replace("-", "", 1))
+            if aop in result.aop_data:
+                continue
         # Preverimo pripadnost BS/IPI z uradnima množicama kod, NE s (prej uporabljeno)
         # grobo številsko mejo "IPI = >=110" - ta bi napačno izločila BS kodo "301"
         # (V. Rezerve, nastale zaradi vrednotenja po pošteni vrednosti), ki je edina BS
