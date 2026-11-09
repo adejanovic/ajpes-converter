@@ -1,0 +1,29 @@
+TESTNO PODJETJE d.o.o. | matična številka 1234567000 | podatki vpisani v Poslovni register Slovenije na dan 01.01.2026
+Osnovni podatki enote PRS
+popolno ime:
+TESTNO PODJETJE, trgovina in storitve, d.o.o.
+kratko ime:
+/
+ulica:
+Testna ulica 1
+naselje:
+Ljubljana
+pošta:
+1000 Ljubljana
+občina:
+Ljubljana
+telefon/telefaks/e-pošta:
+info@testno-podjetje.si (Elektronska pošta)
+Identifikacijski podatki
+matična številka:
+1234567000
+ident. št. za DDV in davčna številka**:
+SI 12345678
+transakcijski računi:
+IBAN SI56 0700 0000 0000 001   (T)   GB d.d., Kranj
+zastopniki:
+Novak Janez, direktor
+Horvat Ana, prokurist
+Drugi podatki
+pravnoorganizacijska oblika:
+Družba z omejeno odgovornostjo d.o.o.

@@ -1,71 +1,20 @@
-# AJPES Bilance Converter — Deploy navodila
+# Omni · Bilance za CBK
 
-## Datoteke v tej mapi
+Pretvori bilanco iz AJPES (PDF, XLSX, XLS) v Excel za uvoz v CBK. Podatke podjetja (naziv, matična, št. partnerja)
+stran prebere iz izreza CRMB, maske HIBIS (pravna oseba), besedila AJPES ePRS ali izpisa iz sodnega registra, zato jih ni treba
+iskati v bilanci in vpisovati ročno.
 
-```
-ajpes_app/
-  app.py              ← celotna aplikacija
-  requirements.txt    ← Python knjižnice
-  Procfile            ← za Railway/Render
-  railway.toml        ← Railway nastavitve
-  template.xlsx       ← !! DODAJ SAM (glej spodaj) !!
-```
+- Vnos podjetja teče v brskalniku (OCR: tesseract.js), strežnik prejme samo naziv, matično in št. partnerja.
+- Pretvorba bilance teče na strežniku (`POST /cbk/convert`, samo za prijavljene); naložene datoteke se po pretvorbi izbrišejo.
+- Koda pretvornika je v `cbk/pretvornik.py`, predloge so `cbk/template*.xlsx`.
+  Za skenirane PDF-je potrebuje strežnik Tesseract in Poppler (`nixpacks.toml`).
 
-## NAJPREJ: Dodaj template
+## Zagon
 
-Kopiraj `CBK_-_template_za_uvoz_bilanc_14052026.xlsx` v to mapo
-in ga **preimenuj** v `template.xlsx`.
+Lokalno: `pip install -r requirements.txt && ALLOW_NO_AUTH=1 python app.py` (brez gesla samo za razvoj).
+Railway: nastavi spremenljivko `APP_PASS` (ali `ACCESS_PASSWORD` kot doslej). Brez gesla je dostop zaprt.
 
----
+## Preizkus
 
-## Deploy na Railway (PRIPOROČENO — brezplačno)
-
-### 1. GitHub — naloži kodo
-
-1. Pojdi na [github.com](https://github.com) → prijavi se (ali ustvari račun)
-2. Klikni **New repository** → ime: `ajpes-converter` → **Create**
-3. Klikni **uploading an existing file**
-4. Naloži VSE datoteke iz te mape (app.py, requirements.txt, Procfile, railway.toml, template.xlsx)
-5. Klikni **Commit changes**
-
-### 2. Railway — deploy
-
-1. Pojdi na [railway.app](https://railway.app) → **Login with GitHub**
-2. Klikni **New Project** → **Deploy from GitHub repo**
-3. Izberi `ajpes-converter`
-4. Railway samodejno zazna Python in zažene app
-
-### 3. Nastavi geslo (OBVEZNO)
-
-1. V Railway projektu klikni na **Variables**
-2. Dodaj: `ACCESS_PASSWORD` = `tvoje_geslo_tukaj`
-3. Railway samodejno restarta aplikacijo
-
-### 4. Pridobi URL
-
-1. Klikni **Settings** → **Domains** → **Generate Domain**
-2. Dobiš URL oblике: `ajpes-converter-production.up.railway.app`
-3. Ta URL pošlji sodelavki
-
----
-
-## Sprememba gesla
-
-V Railway → Variables → spremeni `ACCESS_PASSWORD` → Save
-Aplikacija se samodejno restarta.
-
-## Brezplačna omejitev Railway
-
-Brezplačni plan: 500 ur/mesec — za interno uporabo povsem dovolj.
-Če bi rabili več: Hobby plan = $5/mesec.
-
----
-
-## Kako deluje za uporabnika
-
-1. Odpre URL v brskalniku
-2. Vnese geslo
-3. Naloži AJPES PDF (povleče ali klikne)
-4. Klikne **Pretvori**
-5. Excel se samodejno prenese
-6. Ročno doda samo **Št. partnerja** (celica D5 v BS sheetu)
+`bash tests/run.sh` (Node + `playwright`): prilepi AJPES, naloži izmišljeno bilanco, preveri celice D3 do D5 v Excelu.
+`python tests/cbk_smoke.py`: samo strežniška pretvorba, celica za celico proti pričakovanemu Excelu.

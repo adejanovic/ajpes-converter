@@ -1,0 +1,26 @@
+name: Preizkus
+on:
+  push:
+  pull_request:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: Zaženi aplikacijo in preizkus
+        run: |
+          ALLOW_NO_AUTH=1 PORT=8781 python app.py > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -s localhost:8781 >/dev/null && break; sleep 1; done
+          python tests/cbk_smoke.py
+          node tests/smoke.js
+      - if: failure()
+        run: cat server.log
