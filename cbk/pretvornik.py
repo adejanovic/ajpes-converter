@@ -575,7 +575,7 @@ def is_scanned_no_text(pages_text):
 def validate(result):
     if not result.company.name and result.pdf_format not in ("GDZADRUGE", "OCR", "OCR_SCAN", "AJPES_NATIVE_XLS", "OBRACUNI_MEDLETNI", "AJPES_MEDLETNI_1COL_XLSX", "XLSX_BANKE_EUR"):
         result.errors.append("Ime podjetja ni najdeno.")
-    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR"):
+    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR", "PLAN_1COL_PDF"):
         result.errors.append("Matična številka ni najdena.")
     # Preveri 001/055 samo če je to BS datoteka (IPI-only je ok brez njiju)
     def _safe_aop_int(k):
@@ -5833,6 +5833,65 @@ def parse_ajpes_modul_pdf(pages_text, tip_override=None, tip_subjekta_override=N
                                               + (raw.get("153") or 0) - (raw.get("166") or 0), 2)
     return validate(result)
 
+# ── PARSER: PDF "Podatki iz bilance stanja / izkaza poslovnega izida ZA DRUŽBE" s stolpci
+# Znesek tek./pret. leta + Plan (npr. BP PROJEKTI d.o.o., medletni izpis programa) ──
+# Besedilo iz pdfplumberja ima pokvarjene šumnike (č→", š→presledek, ž→!), zato se
+# prepoznava opira samo na ASCII besedilo glave tabele.
+_PLAN_AMT = r'-?(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2}'
+_PLAN_ROW_RE = re.compile(r'^\s*(\d{3})\s+(.*?)\s+(' + _PLAN_AMT + r')((?:\s+' + _PLAN_AMT + r'){3,5})\s*$')
+
+def _is_plan_1col_pdf(pages_text):
+    first = pages_text[0] if pages_text else ""
+    compact = re.sub(r'\s+', ' ', first)
+    return bool(
+        re.search(r'AOP Naziv postavke Znesek Znesek Plan tek\.leta Plan Znes\.tek\.leta/', compact)
+        and re.search(r'\bPodatki iz (?:bilance stanja|izkaza poslovnega izida)\b', compact, re.I)
+        and re.search(r'\bDatum:\s*\d{1,2}\.\d{1,2}\.\d{4}', compact)
+    )
+
+def parse_plan_1col_pdf(pages_text, tip_override=None, tip_subjekta_override=None):
+    result = ParseResult(pdf_format="PLAN_1COL_PDF")
+    first = pages_text[0] if pages_text else ""
+    full = "\n".join(pages_text)
+    is_ipi = bool(re.search(r'\bPodatki iz izkaza poslovnega izida\b', first, re.I))
+    c = CompanyInfo()
+    for line in first.split('\n'):
+        cand = re.sub(r'\s+Datum:.*$', '', line.strip()).strip()
+        if cand:
+            c.name = cand
+            break
+    pm = re.search(r'\b(?:BS|IPI)\s+(\d{1,2}\.\d{1,2}\.\d{4})\b', full)
+    if pm:
+        c.period_to = pm.group(1)
+    c.tip_subjekta = "1"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override)
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+    result.warnings.append(
+        "Ta izpis ne vsebuje matične številke — vpiši jo ročno v celico D4."
+    )
+    lo, hi = (110, 189) if is_ipi else (1, 96)
+    for page_text in pages_text:
+        for line in page_text.split('\n'):
+            m = _PLAN_ROW_RE.match(line)
+            if not m:
+                continue
+            n = int(m.group(1))
+            if not (lo <= n <= hi):
+                continue
+            aop = f"{n:03d}"
+            if aop in result.aop_data:
+                continue
+            val = parse_si(m.group(3))
+            if val is not None:
+                result.aop_data[aop] = AopEntry(aop=aop, current_year=val, previous_year=None)
+    expected = 80 if is_ipi else 96
+    if len(result.aop_data) < expected:
+        result.warnings.append(
+            f"Format je bil prepoznan le delno: prebranih je {len(result.aop_data)}/{expected} postavk."
+        )
+    return validate(result)
+
+
 def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
     pages_text = []
     pages_words = []
@@ -5857,7 +5916,11 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
     fmt = detect_pdf_format(pages_text)
     if fmt == "AOP" and _is_ajpes_modul_pdf(pages_text):
         fmt = "AJPES_MODUL_PDF"
-    if fmt == "AJPES_MODUL_PDF":
+    if fmt != "AJPES_MODUL_PDF" and _is_plan_1col_pdf(pages_text):
+        fmt = "PLAN_1COL_PDF"
+    if fmt == "PLAN_1COL_PDF":
+        result = parse_plan_1col_pdf(pages_text, tip_override, tip_subjekta_override)
+    elif fmt == "AJPES_MODUL_PDF":
         result = parse_ajpes_modul_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "JOLP":
         result = parse_jolp_format(pages_text, tip_override, tip_subjekta_override)
