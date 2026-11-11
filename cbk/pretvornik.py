@@ -573,9 +573,9 @@ def is_scanned_no_text(pages_text):
     return total_chars < 20 * len(pages_text)
 
 def validate(result):
-    if not result.company.name and result.pdf_format not in ("GDZADRUGE", "OCR", "OCR_SCAN", "AJPES_NATIVE_XLS", "OBRACUNI_MEDLETNI", "AJPES_MEDLETNI_1COL_XLSX"):
+    if not result.company.name and result.pdf_format not in ("GDZADRUGE", "OCR", "OCR_SCAN", "AJPES_NATIVE_XLS", "OBRACUNI_MEDLETNI", "AJPES_MEDLETNI_1COL_XLSX", "XLSX_BANKE_EUR"):
         result.errors.append("Ime podjetja ni najdeno.")
-    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX"):
+    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR"):
         result.errors.append("Matična številka ni najdena.")
     # Preveri 001/055 samo če je to BS datoteka (IPI-only je ok brez njiju)
     def _safe_aop_int(k):
@@ -2511,8 +2511,223 @@ def parse_ajpes_medletni_1col_xlsx(xlsx_path, tip_override=None, tip_subjekta_ov
     return validate(result)
 
 
+# ── PARSER: XLSX "različica I." BS + IPI v EUR brez centov (npr. F. A. MAIK, priprava za banke) ──
+# Dva lista: IPI (A1 "IZKAZ POSLOVNEGA IZIDA (različica I.)...", A3 "(v EUR brez centov)") in BS
+# (A3 "SREDSTVA", B3 "Pojasnilo"). Več stolpcev z datumi v vrstici 3 (različna obdobja) - vzame
+# se stolpec z najnovejšim datumom. Brez AOP kod, brez imena in matične številke: postavke so
+# prepoznane po nazivu v fiksnem zaporedju obrazca.
+_BANKE_BS_SEQ = [
+    ("I. Neopred. sredstva in dolgoročne časovne razmejitve", ["003"]),
+    ("1. Premoženjske pravice", ["004", "005"]),
+    ("II. Opredmetena osnovna sredstva", ["010"]),
+    ("1. Zemljišča in zgradbe", []),
+    ("a) Zemljišča", ["011"]),
+    ("b) Zgradbe", ["012"]),
+    ("2. Druge naprave in oprema", ["014"]),
+    ("4. Opredmetena osnovna sredstva, ki se pridobivajo", ["016"]),
+    ("III. Naložbene nepremičnine", ["018"]),
+    ("IV. Dolgoročne finančne naložbe", ["019"]),
+    ("1. Dolgoročna posojila", ["024"]),
+    ("a) Druga dolgoročna posojila", ["026"]),
+    ("V. Dolgoročne poslovne terjatve", ["027"]),
+    ("VI. Odložene terjatve za davek", ["031"]),
+    ("", ["002"]),
+    ("I. Sredstva (skupine za odtujitev) za prodajo", ["033"]),
+    ("II. Zaloge", ["034"]),
+    ("III. Kratkoročne finančne naložbe", ["040"]),
+    ("1. Kratkoročna posojila", ["045"]),
+    ("a) Druga kratkoročna posojila", ["047"]),
+    ("IV. Kratkoročne poslovne terjatve", ["048"]),
+    ("1. Kratkoročne poslovne terjatve do družb v skupini", ["049"]),
+    ("2. Kratkoročne poslovne terjatve do kupcev", ["050"]),
+    ("3. Kratkoročne poslovne terjatve do drugih", ["051"]),
+    ("V. Denarna sredstva", ["052"]),
+    ("", ["032"]),
+    ("C. Kratkoročne aktivne časovne razmejitve", ["053"]),
+    ("SKUPAJ SREDSTVA", ["001"]),
+    ("I. Vpoklicani kapital", ["057"]),
+    ("1. Osnovni kapital", ["058"]),
+    ("II. Kapitalske rezerve", ["060"]),
+    ("III. Rezerve iz dobička", ["061"]),
+    ("1. Zakonske rezerve", ["062"]),
+    ("2. Druge rezerve", ["066"]),
+    ("IV. Revalorizacijske rezerve", ["067"]),
+    ("V. Rezerve, nastale zaradi vrednotenja po pošteni vrednosti", ["301"]),
+    ("VI. Preneseni čisti poslovni izid", ["P068"]),
+    ("VII. Čisti poslovni izid poslovnega leta", ["P070"]),
+    ("", ["056"]),
+    ("B. Rezervacije in dolgoročne pasivne časovne razmejitve", ["072"]),
+    ("I. Dolgoročne finančne obveznosti", ["076"]),
+    ("1. Dolgoročne finančne obveznosti do bank", ["078"]),
+    ("2. Druge dolgoročne finančne obveznosti", ["079"]),
+    ("II. Dolgoročne poslovne obveznosti", ["080"]),
+    ("1. Druge dolgoročne poslovne obveznosti", ["083"]),
+    ("III. Odložene obveznosti za davek", ["084"]),
+    ("", ["075"]),
+    ("I. Obveznosti, vključene v skupine za odtujitev", ["086"]),
+    ("II. Kratkoročne finančne obveznosti", ["087"]),
+    ("1. Kratkoročne finančne obveznosti do bank", ["089"]),
+    ("2. Druge kratkoročne finančne obveznosti", ["090"]),
+    ("III. Kratkoročne poslovne obveznosti", ["091"]),
+    ("1. Kratkoročne poslovne obveznosti do dobaviteljev", ["093"]),
+    ("2. Druge kratkoročne poslovne obveznosti", ["094"]),
+    ("", ["085"]),
+    ("D. Kratkoročne pasivne časovne razmejitve", ["095"]),
+    ("SKUPAJ OBVEZNOSTI DO VIROV SREDSTEV", ["055"]),
+    ("ZABILANČNA EVIDENCA", ["054", "096"]),
+]
+_BANKE_IPI_SEQ = [
+    ("1. Čisti prihodki od prodaje", ["110"]),
+    ("2. Sprememba vrednosti zalog in nedokončane proizvodnje", ["P121"]),
+    ("3. Usredstveni lastni proizvodi in storitve", ["123"]),
+    ("4. Drugi poslovni prihodki (s prevred. prihodki)", ["125"]),
+    ("5. Stroški blaga, materiala in storitev", ["128"]),
+    ("a)nabavna vrednost materiala", ["129"]),
+    ("b) stroški materiala", ["130", "131"]),
+    ("c) stroški storitev", ["134"]),
+    ("6. Stroški dela", ["139"]),
+    ("a) stroški plač", ["140"]),
+    ("b) stroški pokojninskih zavarovanj", ["141"]),
+    ("stroški socialnih zavarovanj", ["142"]),
+    ("c) drugi stroški dela", ["143"]),
+    ("7. Odpisi vrednosti", ["144"]),
+    ("a) amortizacija", ["145"]),
+    ("b) prevrednotovalni poslovni odhodki pri obratnih sredstvih", ["147"]),
+    ("8. Drugi poslovni odhodki", ["148"]),
+    ("9. Finančni prihodki iz deležev", ["155"]),
+    ("10. Finančni prihodki iz danih posojil", ["160"]),
+    ("a) finančni prihodki iz posojil, danim drugim", ["162"]),
+    ("11. Finančni prihodki iz poslovnih terjatev", ["163"]),
+    ("a) finančni prihodki iz poslovnih terjatev do drugih", ["165"]),
+    ("12. Finančni odhodki iz oslabitev finančnih naložb", ["168"]),
+    ("13. Finančni odhodki iz finančnih obveznosti", ["169"]),
+    ("a) finančni odhodki iz posojil, prejetih od bank", ["171"]),
+    ("b) finančni odhodki iz drugih obveznosti", ["173"]),
+    ("14. Finančni odhodki iz poslovnih obveznosti", ["174"]),
+    ("a) finančni odhodki iz drugih obveznosti", ["177"]),
+    ("15. Drugi prihodki", ["178"]),
+    ("16. Drugi odhodki", ["181"]),
+    ("17. Davek od dohodka", ["184"]),
+    ("18. Odloženi davki", ["185"]),
+    ("19. Čisti poslovni izid obračunskega obdobja", ["P186"]),
+]
+
+def _banke_norm(t):
+    return re.sub(r'[^a-zčšž0-9]', '', str(t).lower())
+
+def _is_banke_eur_xlsx(wb):
+    if "BS" not in wb.sheetnames or "IPI" not in wb.sheetnames:
+        return False
+    ipi, bs = wb["IPI"], wb["BS"]
+    a1 = ipi["A1"].value; a3 = ipi["A3"].value; b3 = bs["A3"].value
+    return (isinstance(a1, str) and a1.strip().upper().startswith("IZKAZ POSLOVNEGA IZIDA (RAZLIČICA I")
+            and isinstance(a3, str) and "brez centov" in a3
+            and isinstance(b3, str) and b3.strip().upper() == "SREDSTVA"
+            and isinstance(bs["B3"].value, str) and bs["B3"].value.strip().lower() == "pojasnilo")
+
+def parse_banke_eur_xlsx(xlsx_path, tip_override=None, tip_subjekta_override=None):
+    import datetime as _dt
+    result = ParseResult(pdf_format="XLSX_BANKE_EUR")
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    c = CompanyInfo()
+
+    def cur_col(ws):
+        best, best_d = None, None
+        for cell in ws[3]:
+            if isinstance(cell.value, (_dt.datetime, _dt.date)):
+                d = cell.value if isinstance(cell.value, _dt.datetime) else _dt.datetime.combine(cell.value, _dt.time())
+                if best_d is None or d >= best_d:
+                    best, best_d = cell.column, d
+        return best, best_d
+
+    def num(v):
+        if isinstance(v, bool): return None
+        if isinstance(v, (int, float)): return round(float(v), 2)
+        if isinstance(v, str):
+            t = v.strip()
+            if re.fullmatch(r'-?', t): return 0.0     # "-" = nič
+        return None
+
+    def walk(ws, seq, col):
+        vals = {}
+        ptr = 0
+        for r in range(4, ws.max_row + 1):
+            if ptr >= len(seq): break
+            lab = ws.cell(r, 1).value
+            v = ws.cell(r, col).value
+            want_lab = seq[ptr][0]
+            if want_lab == "":
+                # vsota brez naziva (stolpec A prazen)
+                if (lab is None or str(lab).strip() == "") and num(v) is not None:
+                    for code in seq[ptr][1]: vals[code] = num(v)
+                    ptr += 1
+                continue
+            if lab is None or _banke_norm(lab) != _banke_norm(want_lab):
+                continue
+            n = num(v)
+            if n is not None:
+                for code in seq[ptr][1]: vals[code] = n
+            ptr += 1
+        return vals, ptr
+
+    col_b, d_b = cur_col(wb["BS"]); col_i, d_i = cur_col(wb["IPI"])
+    if col_b is None or col_i is None:
+        result.errors.append("Stolpec s tekočim obdobjem ni najden."); return validate(result)
+    bsv, p1 = walk(wb["BS"], _BANKE_BS_SEQ, col_b)
+    ipv, p2 = walk(wb["IPI"], _BANKE_IPI_SEQ, col_i)
+    if p1 < len(_BANKE_BS_SEQ):
+        result.warnings.append(f"Bilanca stanja: prepoznanih {p1} od {len(_BANKE_BS_SEQ)} postavk obrazca.")
+    if p2 < len(_BANKE_IPI_SEQ):
+        result.warnings.append(f"Izkaz poslovnega izida: prepoznanih {p2} od {len(_BANKE_IPI_SEQ)} postavk obrazca.")
+
+    # Preneseni čisti poslovni izid / čisti izid leta: pozitivno -> dobiček, negativno -> izguba
+    def split(code, pos, neg, d):
+        if code in d:
+            v = d.pop(code)
+            d[pos] = round(v, 2) if v > 0 else 0.0
+            d[neg] = round(-v, 2) if v < 0 else 0.0
+    split("P068", "068", "069", bsv); split("P070", "070", "071", bsv)
+    # Sprememba vrednosti zalog: pozitivna -> povečanje (121), negativna -> zmanjšanje (122)
+    split("P121", "121", "122", ipv)
+    # Izid iz IPI (zadnja postavka): dobiček -> 186, izguba -> 187
+    split("P186", "186", "187", ipv)
+    # Izpeljane vsote IPI (v obrazcu jih ni): kosmati donos, poslovni odhodki, izid iz poslovanja,
+    # finančni prihodki/odhodki, celotni izid
+    g = lambda k: ipv.get(k, 0.0)
+    ipv["126"] = round(g("110") + g("121") - g("122") + g("123") + g("124") + g("125"), 2)
+    ipv["127"] = round(g("128") + g("139") + g("144") + g("148"), 2)
+    oper = round(ipv["126"] - ipv["127"], 2)
+    ipv["151"] = oper if oper > 0 else 0.0
+    ipv["152"] = -oper if oper < 0 else 0.0
+    ipv["153"] = round(g("155") + g("160") + g("163"), 2)
+    ipv["166"] = round(g("168") + g("169") + g("174"), 2)
+    total = round(oper + ipv["153"] - ipv["166"] + g("178") - g("181"), 2)
+    ipv["182"] = total if total > 0 else 0.0
+    ipv["183"] = -total if total < 0 else 0.0
+    net = round(ipv["186"] - ipv["187"], 2)
+    if abs(net - total + g("184") + g("185")) > 0.01:
+        result.warnings.append(f"Izid iz IPI ({net:.2f}) se ne ujema z izračunanim ({total - g('184') - g('185'):.2f}) - preverite.")
+    if bsv.get("070", 0) - bsv.get("071", 0) != net:
+        result.warnings.append("Čisti izid leta v bilanci se ne ujema z izidom v IPI - preverite.")
+
+    for code, v in bsv.items():
+        result.aop_data[code] = AopEntry(aop=code, current_year=v, previous_year=None)
+    for code, v in ipv.items():
+        result.aop_data[code] = AopEntry(aop=code, current_year=v, previous_year=None)
+
+    if d_i:
+        c.period_to = f"{d_i.day}.{d_i.month}.{d_i.year}"
+        c.period_from = f"1.1.{d_i.year}"
+    c.tip_subjekta = "1"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override)
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+    result.warnings.append("Naziv in matična številka v datoteki nista navedena - v templatu ju dopolnite ročno.")
+    return validate(result)
+
 def parse_xlsx_file(xlsx_path, tip_override=None, tip_subjekta_override=None):
     wb_check = openpyxl.load_workbook(xlsx_path, data_only=True)
+    if _is_banke_eur_xlsx(wb_check):
+        return parse_banke_eur_xlsx(xlsx_path, tip_override, tip_subjekta_override)
     if _find_gd_slash_sheets(wb_check):
         return parse_gd_slash_xlsx(xlsx_path, tip_override, tip_subjekta_override)
     if _find_ajpes_lp_portal_sheet(wb_check):
