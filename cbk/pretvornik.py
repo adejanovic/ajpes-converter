@@ -4980,7 +4980,13 @@ def _is_ajpes_portal_2col_pdf(pages_text):
     return has_subject and has_title and has_cols
 
 _AJPES_PORTAL_ROW_RE_DEC = re.compile(r'(\d{3})\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s*$')
-_AJPES_PORTAL_ROW_RE_INT = re.compile(r'(\d{3})\s+(-?\d+)\s+(-?\d+)\s*$')
+# Cela števila v EUR (brez centov) lahko vsebujejo piko za tisočice (npr. 310.894), zato je
+# poleg golih števk dovoljen tudi zapis s tisočicami; _ajpes_portal_num pretvori oboje.
+_AJPES_PORTAL_ROW_RE_INT = re.compile(r'(\d{3})\s+(-?\d{1,3}(?:\.\d{3})+|-?\d+)\s+(-?\d{1,3}(?:\.\d{3})+|-?\d+)\s*$')
+
+def _ajpes_portal_num(txt):
+    return parse_si(txt) if ',' in txt else float(txt.replace('.', ''))
+
 
 def _ajpes_portal_extract_header_pair(full, label):
     """Za vrstico z oznako (npr. 'Ime poslovnega subjekta:') poišče NASLEDNJO vrstico, kjer
@@ -5038,8 +5044,8 @@ def parse_ajpes_letno_cover_pdf(pages_text, tip_override=None, tip_subjekta_over
         aop = m.group(1)
         if (aop not in BS_AOP and aop not in IPI_AOP) or aop in result.aop_data:
             continue
-        cur = parse_si(m.group(2)) if ',' in m.group(2) else float(m.group(2))
-        prev = parse_si(m.group(3)) if ',' in m.group(3) else float(m.group(3))
+        cur = _ajpes_portal_num(m.group(2))
+        prev = _ajpes_portal_num(m.group(3))
         result.aop_data[aop] = AopEntry(aop=aop, current_year=cur, previous_year=prev)
     return validate(result)
 
@@ -5107,8 +5113,8 @@ def parse_ajpes_portal_2col_pdf(pages_text, tip_override=None, tip_subjekta_over
             continue
         if aop in result.aop_data:
             continue
-        current = parse_si(m.group(2)) if ',' in m.group(2) else float(m.group(2))
-        previous = parse_si(m.group(3)) if ',' in m.group(3) else float(m.group(3))
+        current = _ajpes_portal_num(m.group(2))
+        previous = _ajpes_portal_num(m.group(3))
         if current is not None or previous is not None:
             result.aop_data[aop] = AopEntry(aop=aop, current_year=current, previous_year=previous)
 
