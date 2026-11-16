@@ -5839,6 +5839,186 @@ def parse_ajpes_modul_pdf(pages_text, tip_override=None, tip_subjekta_override=N
                                               + (raw.get("153") or 0) - (raw.get("166") or 0), 2)
     return validate(result)
 
+# ── PARSER: s.p. BS / IPI PDF brez AOP kod ("v EUR (s centi)", dva stolpca: Tekoče / Primerjalno
+# obdobje, cela števila s piko za tisočice), npr. STANISLAV ROKAVEC s.p. Splošni PLAIN_MST
+# parser bere zneske po x-koordinatah z nastavljenima mejama za drug izvoz, zato tu stolpca
+# ne razloči; ta format zato bere po vrsticah besedila in postavke razporedi po besedilu.
+def _spt_norm(text):
+    t = unicodedata.normalize('NFKD', str(text or ''))
+    t = ''.join(ch for ch in t if not unicodedata.combining(ch)).lower()
+    t = re.sub(r'^\s*(?:[ivx]+\.|[a-z]\.|\d{1,2}\.|[a-z]\))\s*', '', t)   # I. / A. / 1. / a)
+    return re.sub(r'[^a-z0-9]', '', t)
+
+_SPT_ROW_RE = re.compile(r'^(.*?\S)\s+(-?\d{1,3}(?:\.\d{3})*|-?\d+)\s+(-?\d{1,3}(?:\.\d{3})*|-?\d+)\s*$')
+
+_SPT_BS = {
+    "sredstva": "001", "dolgorocnasredstva": "002",
+    "neopredmetenasredstvainDolgaktivnecasovnerazmejitve".lower(): "003",
+    "neopredmetenasredstva": "004", "dolgorocneaktivnecasovnerazmejitve": "009",
+    "opredmetenaosnovnasredstva": "010", "nalozbenenepremicnine": "018",
+    "dolgorocnefinancnenalozbe": "019", "dolgorocnefinancnenalozberazenposojil": "020",
+    "dolgorocnaposojila": "024", "dolgorocneposlovneterjatve": "027", "odlozeneterjatvezadavek": "031",
+    "kratkorocnasredstva": "032", "sredstvaskupinezaodtujitevzaprodajo": "033", "zaloge": "034",
+    "kratkorocnefinancnenalozbe": "040", "kratkorocnefinancnenalozberazenposojil": "041",
+    "kratkorocnaposojila": "045", "kratorocneposlovneterjatve": "048", "kratkorocneposlovneterjatve": "048",
+    "denarnasredstva": "052", "kratkorocneaktivnecasovnerazmejitve": "053",
+    "zunajbilancnasredstva": "054", "obveznostidovirovsredstev": "055", "podjetnikovkapital": "056",
+    "zacetnipodjetnikovkapital": "058",
+    "prenosistvarnegapremozenjamedopravljanjemdejavnosti": "060a",
+    "pritokiinodtokidenarnihsredstev": "060b", "revalorizacijskerezerve": "067",
+    "rezervenastalezaradivrednotenjapopostenivrednosti": "301",
+    "rezervacijeindolgorocnepasivnecasovnerazmejitve": "072", "rezervacije": "073",
+    "dolgorocnepasivnecasovnerazmejitve": "074", "dolgorocneobveznosti": "075",
+    "dolgorocnefinancneobveznosti": "076", "dogorocneposlovneobveznosti": "080",
+    "dolgorocneposlovneobveznosti": "080", "odlozeneobveznostizadavek": "084",
+    "kratkorocneobveznosti": "085", "obveznostivkljucenevskupinezaodtujitev": "086",
+    "kratkorocnefinancneobveznosti": "087", "kratkorocneposlovneobveznosti": "091",
+    "kratkorocnepasivnecasovnerazmejitve": "095", "zunajbilancneobveznosti": "096",
+}
+_SPT_BS_DOHODEK = _spt_norm("VI. PODJETNIKOV DOHODEK ALI NEGATIVNI POSLOVNI IZID")
+_SPT_IPI = {
+    "cistiprihodkiizprodaje": "110", "usredstvenilastniproizvodiinlastnestoritve": "123",
+    "drugiposlovniprihodkisprevrednotovalniposlovniprihodki": "125",
+    "strosekblagamaterialainstoritev": "128", "strostkiblagamaterialainstoritev": "128",
+    "stroskiblagamaterialainstoritev": "128",
+    "nabavnavrednostprodanihblagainmaterialaterstroskiporabljenegamateriala": "129",
+    "stroskistoritev": "134", "stroskidela": "139", "stroskiplac": "140",
+    "stroskisocialnihzavarovanj": "S142", "odtegastroskipokojninskihzavarovanj": "141",
+    "drugistroskidela": "143", "odpisivrednosti": "144", "amortizacija": "145",
+    "prevrednotovalniposlovniodhodkipriNeopredmetenihsredstvihinopros".lower(): "146",
+    "prevrednotevalniposlovniodhodkipriobratnihsredstvih": "147",
+    "prevrednotovalniposlovniodhodkipriobratnihsredstvih": "147",
+    "drugiposlovniodhodki": "148",
+    "financniprihodkiizdelezev": "155", "financniprihodkiizdanihposojil": "160",
+    "financniprihodkiizposlovnihterjatev": "163",
+    "finodhodkiizoslabitveinodpisovfinancnihnalozb": "168",
+    "financniodhodkiizfinancnihobveznosti": "169", "financniodhodkiizposlovnihobveznosti": "174",
+    "drugiprihodki": "178", "drugiodhodki": "181",
+}
+_SPT_IPI_PREFIX = (("drugiposlovniprihodki", "125"),
+                   ("prevrednotovalniposlovniodhodkiprineopredmetenih", "146"),
+                   ("prevrednotevalniposlovniodhodkiprineopredmetenih", "146"),
+                   ("prevrednotovalniposlovniodhodkipriobratnih", "147"),
+                   ("prevrednotevalniposlovniodhodkipriobratnih", "147"))
+_SPT_IPI_SPEC = {"spremembavrednostizalogproizvodovinnedokproiz": "ZALOGE",
+                 "podjetnikovdohodekalinegativniposlovniizid": "DOHODEK"}
+
+def _is_sp_text_2col_pdf(pages_text):
+    if not pages_text:
+        return False
+    first = pages_text[0]
+    low = re.sub(r'\s+', ' ', first)
+    if not (re.search(r'Matična številka:\s*\d{6,10}', low) and "Davčna številka:" in low
+            and "Šifra dejavnosti:" in low and "Tekoče obd." in low and "Primerjalno obd." in low
+            and "v EUR (s centi)" in low):
+        return False
+    return (("BILANCA STANJA" in low and "PODJETNIKOV KAPITAL" in low)
+            or ("IZKAZ POSLOVNEGA IZIDA" in low and "PODJETNIKOV DOHODEK" in low))
+
+def parse_sp_text_2col_pdf(pages_text, tip_override=None, tip_subjekta_override=None):
+    result = ParseResult(pdf_format="SP_TEXT_2COL_PDF")
+    full = "\n".join(pages_text)
+    first = pages_text[0]
+    is_ipi = "IZKAZ POSLOVNEGA IZIDA" in first
+    c = CompanyInfo()
+    m = re.search(r'^(\S.*?)\s+Matična številka:\s*(\d{6,10})\s*$', first, re.M)
+    if m:
+        c.name, c.registration_number = m.group(1).strip(), m.group(2)
+    m = re.search(r'Davčna številka:\s*(\d+)', full)
+    if m:
+        c.tax_number = m.group(1)
+    if is_ipi:
+        m = re.search(r'za obdobje od\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+do\s+(\d{1,2}\.\d{1,2}\.\d{4})', full)
+        if m:
+            c.period_from, c.period_to = m.group(1), m.group(2)
+    else:
+        m = re.search(r'na dan\s+(\d{1,2}\.\d{1,2}\.\d{4})', full)
+        if m:
+            c.period_to = m.group(1)
+    if (not c.period_from or len(c.period_from) < 6) and c.period_to:
+        c.period_from = f"1.1.{c.period_to.split('.')[-1]}"
+    c.tip_subjekta = "2"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override or "2")
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+
+    num = lambda t: float(t.replace('.', ''))
+    raw, prev, unmatched = {}, {}, []
+    for line in full.split('\n'):
+        mm = _SPT_ROW_RE.match(line.strip())
+        if not mm:
+            continue
+        label, cur, pre = mm.group(1), num(mm.group(2)), num(mm.group(3))
+        key = _spt_norm(label)
+        if key in ("skupajsredstva", "skupajobveznostidovirovsredstev"):
+            continue
+        if not is_ipi:
+            if key == _SPT_BS_DOHODEK:
+                raw['070'], prev['070'] = (cur, pre) if cur >= 0 else (0.0, 0.0)
+                raw['071'], prev['071'] = (-cur if cur < 0 else 0.0), (-pre if pre < 0 else 0.0)
+                if pre >= 0 and cur >= 0:
+                    prev['070'] = pre
+                continue
+            code = _SPT_BS.get(key)
+        else:
+            code = _SPT_IPI.get(key) or next((c2 for p2, c2 in _SPT_IPI_PREFIX if key.startswith(p2)), None)
+            sp = _SPT_IPI_SPEC.get(key)
+            if sp == "ZALOGE":
+                raw['121'], raw['122'] = (cur if cur >= 0 else 0.0), (-cur if cur < 0 else 0.0)
+                prev['121'], prev['122'] = (pre if pre >= 0 else 0.0), (-pre if pre < 0 else 0.0)
+                continue
+            if sp == "DOHODEK":
+                raw['_DOH'], prev['_DOH'] = cur, pre
+                continue
+        if not code:
+            unmatched.append(label)
+            continue
+        if code in raw:
+            continue
+        raw[code], prev[code] = cur, pre
+    if unmatched:
+        result.warnings.append("Neprepoznane vrstice: " + "; ".join(unmatched[:6]))
+
+    def R(code, d=raw):
+        return d.get(code) or 0.0
+    if is_ipi:
+        for d in (raw, prev):
+            if 'S142' in d:
+                d['142'] = round(d.pop('S142') - (d.get('141') or 0.0), 2)
+            d['124'] = 0.0
+            d['126'] = round(R('110', d) + R('121', d) - R('122', d) + R('123', d) + R('124', d) + R('125', d), 2)
+            d['127'] = round(R('128', d) + R('139', d) + R('144', d) + R('148', d), 2)
+            op = round(R('126', d) - R('127', d), 2)
+            d['151'], d['152'] = (op if op > 0 else 0.0), (-op if op < 0 else 0.0)
+            d['153'] = round(R('155', d) + R('160', d) + R('163', d), 2)
+            d['166'] = round(R('168', d) + R('169', d) + R('174', d), 2)
+            cel = round(op + d['153'] - d['166'] + R('178', d) - R('181', d), 2)
+            if '_DOH' in d:
+                if d is raw and abs(cel - d['_DOH']) > 1.5:
+                    result.warnings.append(f"Podjetnikov dohodek {d['_DOH']:.2f} se razlikuje od preračunanega {cel:.2f}.")
+                cel = d.pop('_DOH')   # natisnjena vrednost je merodajna (izvor je zaokrožen na cele EUR)
+            d['182'], d['183'] = (cel if cel > 0 else 0.0), (-cel if cel < 0 else 0.0)
+
+    for code, v in raw.items():
+        result.aop_data[code] = AopEntry(aop=code, current_year=round(v, 2), previous_year=round(prev.get(code, 0.0), 2))
+
+    if str(result.company.tip_subjekta) == "2":
+        for code in _SP_IPI_COLLISION_CODES:
+            result.aop_data.pop(code, None)
+        def _f(formula):
+            if isinstance(formula, tuple):
+                a, b, op = formula
+                va = raw.get(a) or 0; vb = raw.get(b) or 0
+                return round((va + vb) if op == "+" else (va - vb), 2)
+            return raw.get(formula)
+        for gvaop, formula in (_SP_GVAOP_MAP_IPI if is_ipi else _SP_GVAOP_MAP_BS).items():
+            val = _f(formula)
+            if val is not None:
+                result.gvaop_data[gvaop] = val
+        if is_ipi and any(raw.get(k) is not None for k in ("151", "152", "153", "166")):
+            result.gvaop_data["067"] = round(R('151') - R('152') + R('153') - R('166'), 2)
+    return validate(result)
+
+
 # ── PARSER: PDF "Poslovni izid za stranko" računovodskega servisa (npr. VELE BIRO za PBI
 # PRELOG d.o.o.) - interni izpis poslovnega izida po kontnih skupinah 40/41/43/47/48 (EU
 # znesek + "€"), brez bilance stanja. Vrstice so oblike "<opis> 123,45 €". Razporeditev na AOP
@@ -6089,8 +6269,12 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         fmt = "PLAN_1COL_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_vele_biro_ipi_pdf(pages_text):
         fmt = "VELE_BIRO_IPI_PDF"
+    if fmt == "PLAIN_MST" and _is_sp_text_2col_pdf(pages_text):
+        fmt = "SP_TEXT_2COL_PDF"
     if fmt == "VELE_BIRO_IPI_PDF":
         result = parse_vele_biro_ipi_pdf(pages_text, tip_override, tip_subjekta_override)
+    elif fmt == "SP_TEXT_2COL_PDF":
+        result = parse_sp_text_2col_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "PLAN_1COL_PDF":
         result = parse_plan_1col_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "AJPES_MODUL_PDF":
