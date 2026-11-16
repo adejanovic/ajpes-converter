@@ -575,7 +575,7 @@ def is_scanned_no_text(pages_text):
 def validate(result):
     if not result.company.name and result.pdf_format not in ("GDZADRUGE", "OCR", "OCR_SCAN", "AJPES_NATIVE_XLS", "OBRACUNI_MEDLETNI", "AJPES_MEDLETNI_1COL_XLSX", "XLSX_BANKE_EUR"):
         result.errors.append("Ime podjetja ni najdeno.")
-    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR", "PLAN_1COL_PDF"):
+    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR", "PLAN_1COL_PDF", "VELE_BIRO_IPI_PDF"):
         result.errors.append("Matična številka ni najdena.")
     # Preveri 001/055 samo če je to BS datoteka (IPI-only je ok brez njiju)
     def _safe_aop_int(k):
@@ -5839,6 +5839,169 @@ def parse_ajpes_modul_pdf(pages_text, tip_override=None, tip_subjekta_override=N
                                               + (raw.get("153") or 0) - (raw.get("166") or 0), 2)
     return validate(result)
 
+# ── PARSER: PDF "Poslovni izid za stranko" računovodskega servisa (npr. VELE BIRO za PBI
+# PRELOG d.o.o.) - interni izpis poslovnega izida po kontnih skupinah 40/41/43/47/48 (EU
+# znesek + "€"), brez bilance stanja. Vrstice so oblike "<opis> 123,45 €". Razporeditev na AOP
+# (IPI) se naredi tu; vsota skupin se preveri z natisnjenimi vsotami iz izpisa. ──
+def _vb_norm(s):
+    return re.sub(r'[^a-zčšž0-9]', '', s.lower())
+
+_VB_ROW_RE = re.compile(r'^(.*?)\s*[:]?\s+(-?(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2})\s*€\s*$')
+
+_VB_M40 = ["Stroški materiala", "Stroški pomožnega materiala", "Stroški energije (elektrika, gorivo)",
+           "Stroški vode", "Stroški pisarniškega materiala", "Drugi stroški materiala"]
+_VB_S41 = ["Stroški storitev pri ustvarjanju proizvodov in upravljanju storitev", "Stroški telefona in pošte",
+           "Stroški transportnih storitev", "Stroški storitev v zvezi z vzdrževanjem", "Stroški najemnin",
+           "Stroški cestnin, parkirnin, kilometrine, dnevnic in nočitev", "Stroški bančnih storitev",
+           "Stroški zavarovalnih premij", "Stroški intelektulanih in osebnih storitev", "Stroški sejmov in reklame",
+           "Stroški reprezentance", "Stroški storitev fizičnih oseb, ki ne opravljajo dejavnosti",
+           "Stroški fizičnega varovanja", "Stroški drugih storitev"]
+_VB_A43 = ["Stroški amortizacije zgradb", "Stroški amortizacije opreme in nadomestnih delov"]
+_VB_D47 = ["Stroški plače zaposlenih", "Stroški nadomestil plač zaposlenih",
+           "Stroški regres za letni dopust, bonitete, povračila", "Stroški delodajalčevih prispevkov",
+           "Stroški dodatnega pokojninskega zavarovanja", "Drugi stroški dela"]
+_VB_O48 = ["Stroški članarin, upravnih taks in ostalih drugih stroškov", "Stroški stavbnega zemljišča",
+           "Stroški štipendij dijakov in študentov"]
+
+def _is_vele_biro_ipi_pdf(pages_text):
+    first = re.sub(r'\s+', ' ', pages_text[0]) if pages_text else ""
+    return ("Poslovni izid za stranko" in first
+            and "Prihodki ugotovljeni po računovodskih predpisih skupaj" in first
+            and "Odhodki ugotovljeni po računovodskih predpisih skupaj" in first
+            and "Skupaj stroški 40" in first)
+
+def parse_vele_biro_ipi_pdf(pages_text, tip_override=None, tip_subjekta_override=None):
+    result = ParseResult(pdf_format="VELE_BIRO_IPI_PDF")
+    first = pages_text[0]
+    c = CompanyInfo()
+    m = re.search(r'Poslovni izid za stranko\s+(.+?)\s+za obdobje od\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+do\s+(\d{1,2}\.\d{1,2}\.\d{4})', first)
+    if m:
+        c.name = m.group(1).strip()
+        c.period_from, c.period_to = m.group(2), m.group(3)
+    c.tip_subjekta = "1"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override)
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+    result.warnings.append(
+        "Izpis vsebuje samo poslovni izid (brez bilance stanja, matične številke in števila zaposlenih)."
+    )
+    vals = {}
+    for line in first.split('\n'):
+        mm = _VB_ROW_RE.match(line.strip())
+        if mm:
+            vals.setdefault(_vb_norm(mm.group(1)), parse_si(mm.group(2)))
+    def g(label, required=True):
+        v = vals.get(_vb_norm(label))
+        if v is None:
+            if required:
+                result.errors.append(f"Manjka postavka: {label}")
+            return 0.0
+        return round(v, 2)
+    def r2(x):
+        return round(x + 0.0, 2)
+
+    rev_dom = g("Poslovni prihodki od prodaje proizvodov in storitev na domačem trgu")
+    rev_eu = g("Poslovni prihodki od prodaje proizvodov in storitev na tujem trgu – EU")
+    rev_third = g("Poslovni prihodki od prodaje proizvodov in storitev na tujem trgu – tretje države")
+    subv = g("Subvencije, dotacije, regresi, kompenzacije in drugi prihodki, ki so povezani s poslovnimi učinki")
+    prevr_prih = g("Prevrednetovalni poslovni prihodki (prevrednotenje OS, odprava oslabitev, tečajne razlike)")
+    fin_prih = g("Finančni prihodki (obresti, devidende, prodaja VP)")
+    drugi_prih = g("Drugi prihodki (prejete odškodnine, prejete donacije, odpisi obv., prodaja OS)")
+
+    m40 = {k: g(k) for k in _VB_M40}
+    s41 = {k: g(k) for k in _VB_S41}
+    a43 = {k: g(k) for k in _VB_A43}
+    d47 = {k: g(k) for k in _VB_D47}
+    o48 = {k: g(k) for k in _VB_O48}
+    # preveri natisnjene vsote skupin (izvorna napaka v izpisu se javi, računa pa se iz postavk)
+    for lbl, d in (("Skupaj stroški 40 -Material", m40), ("Skupaj stroški 41 -Stroški storitev", s41),
+                   ("Skupaj stroški 43 -Stroški amortizacije", a43), ("Skupaj stroški 47 -Stroški dela", d47),
+                   ("Skupaj stroški 48 - Drugi stroški", o48)):
+        tot = g(lbl)
+        if abs(r2(sum(d.values())) - tot) > 0.005:
+            result.warnings.append(f"Vsota postavk ne ustreza natisnjeni vsoti '{lbl}' "
+                                   f"({r2(sum(d.values()))} ≠ {tot}); uporabljena je vsota postavk.")
+
+    prev_os = g("Prevrednotevalni poslovni odhodki v zvezi z neodpredmetinimi in opredmetenimi OS")
+    prev_zal = g("Prevrednotevalni poslovni odhodki v zvezi z zalogami")
+    prev_ter1 = g("Prevrednotovalni poslovni odhodki kot posledica prevrednotenja zaradi oslabitve v zvezi s poslovnimi terjatvami")
+    prev_ter2 = g("Prevrednotovalni poslovni odhodki kot posledica odpisov v zvezi s poslovnimi terjatvami")
+    prev_dr = g("Drugi prevrednotovalni poslovni odhodki v zvezi s kratkoročnimi sredstvi, razen s finančnimi naložbami")
+    nv_blaga = g("Nabavna vrednost prodanega blaga in materiala (Nabava blaga +/- Sprememba zalog)")
+
+    f_bank = g("Odhodki iz posojil, prejetih od bank in drugih organizacij")
+    f_tec = g("Odhodki negativne tečajne razlike")
+    f_dr = g("Odhodki iz drugih finančnih obveznosti")
+    f_osl = g("Odhodki iz oslabitve finančnih naložb")
+    dr_odh = sum(g(k) for k in ("Denarne kazni, ki niso povezane s poslovnimi učinki",
+                                "Odškodnine, ki niso povezane s poslovnimi učinki", "Dane donacije",
+                                "Subvencije, dotacije in podobni odhodki, ki niso povezani s poslovnimi učinki",
+                                "Drugi in izredni odhodki"))
+
+    A = {}
+    def put(k, v):
+        A[k] = r2(v)
+    put('112', rev_dom); put('111', rev_dom); put('113', 0); put('114', 0)
+    put('116', rev_eu); put('115', rev_eu); put('117', 0)
+    put('119', rev_third); put('118', rev_third); put('120', 0)
+    put('110', rev_dom + rev_eu + rev_third)
+    put('121', 0); put('122', 0); put('123', 0)
+    put('124', subv); put('125', prevr_prih)
+    put('126', A['110'] + A['124'] + A['125'])
+    put('129', nv_blaga)
+    put('131', m40["Stroški materiala"] + m40["Stroški pomožnega materiala"])
+    put('132', m40["Stroški energije (elektrika, gorivo)"] + m40["Stroški vode"])
+    put('133', m40["Stroški pisarniškega materiala"] + m40["Drugi stroški materiala"])
+    put('130', A['131'] + A['132'] + A['133'])
+    put('135', s41["Stroški transportnih storitev"]); put('136', s41["Stroški najemnin"])
+    put('137', s41["Stroški cestnin, parkirnin, kilometrine, dnevnic in nočitev"])
+    put('138', sum(s41.values()) - A['135'] - A['136'] - A['137'])
+    put('134', A['135'] + A['136'] + A['137'] + A['138'])
+    put('128', A['129'] + A['130'] + A['134'])
+    put('140', d47["Stroški plače zaposlenih"] + d47["Stroški nadomestil plač zaposlenih"])
+    put('141', d47["Stroški dodatnega pokojninskega zavarovanja"])
+    put('142', d47["Stroški delodajalčevih prispevkov"])
+    put('143', d47["Stroški regres za letni dopust, bonitete, povračila"] + d47["Drugi stroški dela"])
+    put('139', A['140'] + A['141'] + A['142'] + A['143'])
+    put('145', sum(a43.values())); put('146', prev_os)
+    put('147', prev_zal + prev_ter1 + prev_ter2 + prev_dr)
+    put('144', A['145'] + A['146'] + A['147'])
+    put('149', 0); put('150', sum(o48.values())); put('148', A['149'] + A['150'])
+    put('127', A['128'] + A['139'] + A['144'] + A['148'])
+    op = A['126'] - A['127']
+    put('151', op if op > 0 else 0); put('152', -op if op < 0 else 0)
+    # finančni prihodki: izpis jih ne razdeli (obresti/dividende/prodaja VP skupaj)
+    if abs(fin_prih) > 0.005:
+        put('159', fin_prih); put('155', fin_prih)
+        result.warnings.append("Finančni prihodki v izpisu niso razčlenjeni; vpisani so v AOP 159 – preveri razporeditev.")
+    put('153', fin_prih)
+    put('168', f_osl)
+    put('170', 0); put('171', f_bank); put('172', 0); put('173', f_dr + f_tec)
+    put('169', A['170'] + A['171'] + A['172'] + A['173'])
+    put('174', 0)
+    put('166', A['168'] + A['169'] + A['174'])
+    put('179', 0); put('180', drugi_prih); put('178', A['179'] + A['180'])
+    put('181', dr_odh)
+    cel = A['126'] - A['127'] + A['153'] - A['166'] + A['178'] - A['181']
+    put('182', cel if cel > 0 else 0); put('183', -cel if cel < 0 else 0)
+    put('184', 0); put('185', 0)
+    net = cel - A['184'] - A['185']
+    put('186', net if net > 0 else 0); put('187', -net if net < 0 else 0)
+
+    # kontrola z natisnjenimi vsotami izpisa
+    checks = (("Prihodki ugotovljeni po računovodskih predpisih skupaj:",
+               A['126'] + A['153'] + A['178'] + 0.0),
+              ("Poslovni odhodki skupaj:", A['127']),
+              ("Finančni odhodki:", A['166']), ("Drugi odhodki:", A['181']),
+              ("Odhodki ugotovljeni po računovodskih predpisih skupaj:", A['127'] + A['166'] + A['181']))
+    for lbl, calc in checks:
+        pr = g(lbl)
+        if abs(r2(calc) - pr) > 0.005:
+            result.errors.append(f"Kontrola '{lbl}': izračunano {r2(calc)} ≠ izpis {pr}.")
+    for k, v in A.items():
+        result.aop_data[k] = AopEntry(aop=k, current_year=v, previous_year=None)
+    return validate(result)
+
+
 # ── PARSER: PDF "Podatki iz bilance stanja / izkaza poslovnega izida ZA DRUŽBE" s stolpci
 # Znesek tek./pret. leta + Plan (npr. BP PROJEKTI d.o.o., medletni izpis programa) ──
 # Besedilo iz pdfplumberja ima pokvarjene šumnike (č→", š→presledek, ž→!), zato se
@@ -5924,7 +6087,11 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         fmt = "AJPES_MODUL_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_plan_1col_pdf(pages_text):
         fmt = "PLAN_1COL_PDF"
-    if fmt == "PLAN_1COL_PDF":
+    if fmt != "AJPES_MODUL_PDF" and _is_vele_biro_ipi_pdf(pages_text):
+        fmt = "VELE_BIRO_IPI_PDF"
+    if fmt == "VELE_BIRO_IPI_PDF":
+        result = parse_vele_biro_ipi_pdf(pages_text, tip_override, tip_subjekta_override)
+    elif fmt == "PLAN_1COL_PDF":
         result = parse_plan_1col_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "AJPES_MODUL_PDF":
         result = parse_ajpes_modul_pdf(pages_text, tip_override, tip_subjekta_override)
