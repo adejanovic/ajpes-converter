@@ -924,6 +924,17 @@ def parse_napoved_format(pages_text, tip_override=None, tip_subjekta_override=No
             reg = m.group(2).strip()
             # NAPOVED format ima 7-mestno matično — dodaj 000 do 10 mest
             c.registration_number = reg.ljust(10, '0') if len(reg) < 10 else reg
+    # Nadomestna glava (knjigovodski izpis, npr. MPAL d.o.o.): prva vrstica = ime
+    # ("MPAL d.o.o. MPAL, skladiščenje, d.o.o." -> kratko ime do prve pravne oblike),
+    # druga vrstica vsebuje "Matična št.: NNNNNNN". Uporabi se samo, ko prvotna glava
+    # ni našla imena, zato ostali NAPOVED izvozi ostanejo nespremenjeni.
+    if not c.name and len(lines) > 1:
+        mm = re.search(r'Matična št\.?:\s*(\d{6,10})', "\n".join(lines[:4]))
+        if mm:
+            m1 = re.match(r'^(.+?\b(?:d\.\s?o\.\s?o\.|d\.\s?d\.|s\.\s?p\.))(?=\s|$)', lines[0].strip(), re.I)
+            c.name = (m1.group(1) if m1 else lines[0]).strip()
+            reg = mm.group(1)
+            c.registration_number = reg.ljust(10, '0') if len(reg) < 10 else reg
     m = re.search(r'Davčna številka:\s*(\d+)', full)
     if m: c.tax_number = m.group(1).strip()
     m = re.search(r'na dan\s+([\d]{1,2}\.[\d]{1,2}\.[\d]{4})', full)
@@ -933,6 +944,13 @@ def parse_napoved_format(pages_text, tip_override=None, tip_subjekta_override=No
     if m and not c.period_to: c.period_to = m.group(1).strip()
     m = re.search(r'od\s+([\d]{1,2}\.[01]?\d\.[\d]{4})\s+do', full)
     if m: c.period_from = m.group(1).strip()
+    if not c.period_to:
+        # "Obdobje 0-7 / 2026" (kumulativa od začetka leta do konca julija 2026)
+        mo = re.search(r'Obdobje\s+(\d{1,2})\s*-\s*(\d{1,2})\s*/\s*(\d{4})', full)
+        if mo and 1 <= int(mo.group(2)) <= 12:
+            m1_, m2_, y_ = int(mo.group(1)), int(mo.group(2)), int(mo.group(3))
+            c.period_from = f"1.{m1_ if m1_ >= 1 else 1}.{y_}"
+            c.period_to = f"{calendar.monthrange(y_, m2_)[1]}.{m2_:02d}.{y_}"
     if (not c.period_from or len(c.period_from) < 6) and c.period_to:
 
         c.period_from = _infer_period_from(c.period_to)
