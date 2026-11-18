@@ -6506,11 +6506,11 @@ def export_excel(result, output_path):
     # Datuma sta pravi Excel DATE vrednosti in morata biti prikazana v kratki obliki.
     # CBK uvoz pri teh celicah pričakuje kratek datum (npr. 31.05.2026), ne dolge oblike.
     ws.cell(11,4).value = _to_excel_date(c.period_to)
-    ws.cell(11,4).number_format = "dd.mm.yyyy"
+    ws.cell(11,4).number_format = r"dd\.mm\.yyyy"
     # C8 ("Podatki iz bilance stanja" datum) je bilo prej treba vpisati ročno — zdaj ga
     # napolnimo samodejno z istim datumom kot D11 in prav tako prisilimo kratko obliko.
     ws.cell(8,3).value  = _to_excel_date(c.period_to)
-    ws.cell(8,3).number_format = "dd.mm.yyyy"
+    ws.cell(8,3).number_format = r"dd\.mm\.yyyy"
 
     idx = build_idx(ws); bs_n = 0
     _gv_only = getattr(result, "pdf_format", "") == "AJPES_DRUSTVO_XLS"
@@ -6539,7 +6539,7 @@ def export_excel(result, output_path):
     if c.period_from and c.period_to:
         ws2.cell(8,3).value = f"{c.period_from} - {c.period_to}"
     ws2.cell(11,4).value = _to_excel_date(c.period_to)
-    ws2.cell(11,4).number_format = "dd.mm.yyyy"
+    ws2.cell(11,4).number_format = r"dd\.mm\.yyyy"
 
     idx2 = build_idx(ws2); ipi_n = 0
     # Bonitetni sistem izgubo iz poslovanja prikaže kot negativen AOP 151;
