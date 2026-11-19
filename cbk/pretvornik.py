@@ -2846,10 +2846,43 @@ def _is_porocilo_gd_xls(rows):
             return True
     return False
 
-def parse_porocilo_gd_xls(rows, tip_override=None, tip_subjekta_override=None):
+def _porocilo_gd_cur_col(rows):
+    """Stolpec tekočega obdobja po BESEDILU glave (npr. 'Tekoče leto na dan 30.9.2026' ali
+    'Tekoče leto  1.1.2026 - 30.9.2026'). Pri izvozih z več obdobji (30.6., 30.9., 'predvideni IPI',
+    'Preteklo leto') vzamemo najnovejši stolpec 'Tekoče leto' brez 'predvideni'. Če glave ni ali ima
+    samo en stolpec z vrednostmi, ostane stolpec 2 kot doslej. Vrne (stolpec, datum_od, datum_do)."""
+    for row in rows[:14]:
+        if not row or not isinstance(row[0], str) or row[0].strip().upper() != "NAZIV":
+            continue
+        best = None
+        for j in range(2, len(row)):
+            h = row[j]
+            if not isinstance(h, str):
+                continue
+            hl = h.lower()
+            if "teko" not in hl or "predvid" in hl:
+                continue
+            ds = re.findall(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', h)
+            if not ds:
+                continue
+            d, m, y = (int(x) for x in ds[-1])
+            key = (y, m, d)
+            if best is None or key > best[0]:
+                frm = None
+                if len(ds) > 1:
+                    d0, m0, y0 = (int(x) for x in ds[0])
+                    frm = f"{d0}.{m0}.{y0}"
+                best = (key, j, frm, f"{d}.{m}.{y}")
+        if best:
+            return best[1], best[2], best[3]
+    return 2, None, None
+
+def parse_porocilo_gd_xls(rows, tip_override=None, tip_subjekta_override=None, extra_rows=()):
     result = ParseResult(pdf_format="POROCILO_GD")
     c = CompanyInfo()
     is_ipi = False
+    _all_rows = [rows] + list(extra_rows)
+    _cols = [_porocilo_gd_cur_col(r) for r in _all_rows]
     for row in rows[:10]:
         if not row: continue
         v0 = row[0]
@@ -2870,6 +2903,12 @@ def parse_porocilo_gd_xls(rows, tip_override=None, tip_subjekta_override=None):
             last_day = calendar.monthrange(int(y2), int(m2_))[1]
             c.period_to = f"{last_day}.{int(m2_)}.{y2}"
 
+    for _col, _frm, _to in _cols:
+        if _to and not c.period_to:
+            c.period_to = _to
+        if _frm and (not c.period_from or len(c.period_from) < 6):
+            c.period_from = _frm
+
     if (not c.period_from or len(c.period_from) < 6) and c.period_to:
         leto = c.period_to.split('.')[-1]
         c.period_from = f"1.1.{leto}"
@@ -2880,7 +2919,8 @@ def parse_porocilo_gd_xls(rows, tip_override=None, tip_subjekta_override=None):
     if not result.company.registration_number:
         result.warnings.append("Ta format ne vsebuje matične številke — vpiši jo ročno v celico D4.")
 
-    for row in rows:
+    for _rows, (_col, _f, _t) in zip(_all_rows, _cols):
+      for row in _rows:
         if not row or len(row) < 3: continue
         aop_raw = row[1]
         if not isinstance(aop_raw, (int, float)) or isinstance(aop_raw, bool):
@@ -2893,10 +2933,10 @@ def parse_porocilo_gd_xls(rows, tip_override=None, tip_subjekta_override=None):
         code = str(n).zfill(3)
         if code in result.aop_data:
             continue
-        val = row[2] if len(row) > 2 else None
+        val = row[_col] if len(row) > _col else None
         num = val if isinstance(val, (int, float)) and not isinstance(val, bool) else parse_si(val) if isinstance(val, str) else None
         if num is not None:
-            result.aop_data[code] = AopEntry(aop=code, current_year=num, previous_year=None)
+            result.aop_data[code] = AopEntry(aop=code, current_year=round(num, 2), previous_year=None)
     return validate(result)
 
 # ── PARSER: AJPES-native "Bilanca" .xls izvoz (listi BS / IPIZ, eksplicitna kolona    ──
@@ -3716,9 +3756,9 @@ def parse_xls_file(xls_path, tip_override=None, tip_subjekta_override=None):
     if obr_bs or obr_iu:
         return parse_obracuni_medletni_xls(xls_path, tip_override, tip_subjekta_override)
 
-    for rows in rows_by_sheet.values():
-        if _is_porocilo_gd_xls(rows):
-            return parse_porocilo_gd_xls(rows, tip_override, tip_subjekta_override)
+    _gd_sheets = [rows for rows in rows_by_sheet.values() if _is_porocilo_gd_xls(rows)]
+    if _gd_sheets:
+        return parse_porocilo_gd_xls(_gd_sheets[0], tip_override, tip_subjekta_override, extra_rows=_gd_sheets[1:])
 
     result = parse_excel_rows(rows_by_sheet, tip_override, tip_subjekta_override, "XLS")
     # Izpis "V TISK": ime podjetja je v celici pod oznako "IME DRUŽBE OZ. PODJETNIKA:",
