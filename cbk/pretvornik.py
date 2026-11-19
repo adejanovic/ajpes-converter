@@ -3384,6 +3384,22 @@ def _ajpes_native_xls_sheets(rows_by_sheet):
             ipiz_name = name
     return bs_name, ipiz_name
 
+def _ajpes_native_value_cols(rows, first_col):
+    """Stolpca tekočega/prejšnjega obdobja. Nekateri izvozi imajo pred njima še stolpec 'Plan'
+    (v glavi BS 'Plan', v glavi IPIZ 'Plan 2026') - tega preskočimo. Brez plan stolpca ostane
+    kot doslej (first_col = tekoče, first_col+1 = prejšnje)."""
+    plan = set()
+    for ri in (1, 2):
+        if ri < len(rows):
+            for j, v in enumerate(rows[ri]):
+                if j >= first_col and isinstance(v, str) and "plan" in v.lower():
+                    plan.add(j)
+    ncols = max((len(r) for r in rows[:4]), default=first_col + 2)
+    cols = [j for j in range(first_col, ncols) if j not in plan]
+    if len(cols) >= 2:
+        return cols[0], cols[1]
+    return first_col, first_col + 1
+
 def _ajpes_native_xls_period(book, sheet, row_idx, col_cur, col_prev):
     dm = book.datemode
     def _to_date(v):
@@ -3407,11 +3423,13 @@ def parse_ajpes_native_xls(xls_path, tip_override=None, tip_subjekta_override=No
     result = ParseResult(pdf_format="AJPES_NATIVE_XLS")
     c = CompanyInfo()
 
+    bs_cc, bs_pc = _ajpes_native_value_cols(rows_by_sheet[bs_name], 3) if bs_name else (3, 4)
+    ip_cc, ip_pc = _ajpes_native_value_cols(rows_by_sheet[ipiz_name], 4) if ipiz_name else (4, 5)
     d_cur = d_prev = None
     if bs_name:
-        d_cur, d_prev = _ajpes_native_xls_period(book, book.sheet_by_name(bs_name), 2, 3, 4)
+        d_cur, d_prev = _ajpes_native_xls_period(book, book.sheet_by_name(bs_name), 2, bs_cc, bs_pc)
     elif ipiz_name:
-        d_cur, d_prev = _ajpes_native_xls_period(book, book.sheet_by_name(ipiz_name), 2, 4, 5)
+        d_cur, d_prev = _ajpes_native_xls_period(book, book.sheet_by_name(ipiz_name), 2, ip_cc, ip_pc)
     if d_cur:
         c.period_to = f"{d_cur.day}.{d_cur.month}.{d_cur.year}"
         c.period_from = f"1.1.{d_cur.year}"
@@ -3424,37 +3442,50 @@ def parse_ajpes_native_xls(xls_path, tip_override=None, tip_subjekta_override=No
 
     if bs_name:
         for row in rows_by_sheet[bs_name][3:]:
-            if len(row) < 5:
+            if len(row) < max(5, bs_pc + 1):
                 continue
             aop_raw = row[2]
             aop = str(aop_raw).strip() if isinstance(aop_raw, str) else None
             if not aop or not aop.isdigit():
                 continue
             code = aop.zfill(3)
-            cur = row[3] if isinstance(row[3], (int, float)) and not isinstance(row[3], bool) else None
-            prev = row[4] if isinstance(row[4], (int, float)) and not isinstance(row[4], bool) else None
+            cur = row[bs_cc] if isinstance(row[bs_cc], (int, float)) and not isinstance(row[bs_cc], bool) else None
+            prev = row[bs_pc] if isinstance(row[bs_pc], (int, float)) and not isinstance(row[bs_pc], bool) else None
             if cur is None and prev is None:
                 continue
+            if code in result.aop_data:
+                # ista AOP koda v dveh vrsticah (npr. 094: 'na podlagi predujmov' + '3. Druge kratkoročne
+                # poslovne obveznosti') = delne postavke ene kode, seštejemo ju (ne prepišemo).
+                _o = result.aop_data[code]
+                cur = (_o.current_year or 0) + (cur or 0) if (_o.current_year is not None or cur is not None) else None
+                prev = (_o.previous_year or 0) + (prev or 0) if (_o.previous_year is not None or prev is not None) else None
             result.aop_data[code] = AopEntry(aop=code, current_year=cur, previous_year=prev)
     else:
         result.warnings.append("List z bilanco stanja (BS) ni bil najden v datoteki.")
 
     if ipiz_name:
         for row in rows_by_sheet[ipiz_name][3:]:
-            if len(row) < 6:
+            if len(row) < max(6, ip_pc + 1):
                 continue
             aop_raw = row[3]
             aop = str(aop_raw).strip() if isinstance(aop_raw, str) else None
             if not aop or not aop.isdigit():
                 continue
             code = aop.zfill(3)
-            cur = row[4] if isinstance(row[4], (int, float)) and not isinstance(row[4], bool) else None
-            prev = row[5] if isinstance(row[5], (int, float)) and not isinstance(row[5], bool) else None
+            cur = row[ip_cc] if isinstance(row[ip_cc], (int, float)) and not isinstance(row[ip_cc], bool) else None
+            prev = row[ip_pc] if isinstance(row[ip_pc], (int, float)) and not isinstance(row[ip_pc], bool) else None
             if cur is None and prev is None:
                 continue
             result.aop_data[code] = AopEntry(aop=code, current_year=cur, previous_year=prev)
     else:
         result.warnings.append("List z izkazom poslovnega izida (IPIZ) ni bil najden v datoteki.")
+
+    # Zneski na cent (izvozi imajo včasih podcentne decimalke ali plavajoči šum, npr. 9983964.098).
+    for _e in result.aop_data.values():
+        if isinstance(_e.current_year, float):
+            _e.current_year = round(_e.current_year, 2)
+        if isinstance(_e.previous_year, float):
+            _e.previous_year = round(_e.previous_year, 2)
 
     return validate(result)
 
