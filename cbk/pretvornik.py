@@ -575,7 +575,7 @@ def is_scanned_no_text(pages_text):
 def validate(result):
     if not result.company.name and result.pdf_format not in ("GDZADRUGE", "OCR", "OCR_SCAN", "AJPES_NATIVE_XLS", "OBRACUNI_MEDLETNI", "AJPES_MEDLETNI_1COL_XLSX", "XLSX_BANKE_EUR"):
         result.errors.append("Ime podjetja ni najdeno.")
-    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR", "PLAN_1COL_PDF", "VELE_BIRO_IPI_PDF"):
+    if not result.company.registration_number and result.pdf_format not in ("UPR", "GDZADRUGE", "OCR", "OCR_SCAN", "POROCILO_GD", "VIZIJA", "ZAVOD_MEDLETNI", "AJPES_NATIVE_XLS", "URADNI", "OBRACUNI_MEDLETNI", "BS_IPI_AJPES", "AJPES_1COL", "VASCO_AJPES_1COL", "AJPES_ZAP", "PODATKI_AJPES", "AJPES_MEDLETNI_1COL_XLSX", "NOVA_VERZIJA", "TEKOCE_ZAP", "GD_SLASH_XLSX", "XLSX_BANKE_EUR", "PLAN_1COL_PDF", "PODATEK_TEKOCEGA_PDF", "VELE_BIRO_IPI_PDF"):
         result.errors.append("Matična številka ni najdena.")
     # Preveri 001/055 samo če je to BS datoteka (IPI-only je ok brez njiju)
     def _safe_aop_int(k):
@@ -6330,6 +6330,59 @@ def parse_plan_1col_pdf(pages_text, tip_override=None, tip_subjekta_override=Non
     return validate(result)
 
 
+# ── PARSER: PDF "Bilanca stanja" / "Izkaz poslovnega izida" s stolpci Postavka | AOP | Podatek
+# tekočega leta (npr. J.A.T. TEAM d.o.o.; glava Podjetje / Sedež / Davčna št. / Za obdobje) ──
+_JAT_ROW_RE = re.compile(r'^\s*(?:.*?)\s*\b(\d{3})\s+(' + _PLAN_AMT + r')\s*$')
+
+def _is_podatek_tekocega_pdf(pages_text):
+    first = pages_text[0] if pages_text else ""
+    return bool(
+        re.search(r'^\s*(Bilanca stanja|Izkaz poslovnega izida)\s*$', first, re.M)
+        and re.search(r'^\s*Podjetje:\s*\S', first, re.M)
+        and re.search(r'^\s*Za obdobje:\s*\d{2}\.\d{2}\.\d{4}\s*-\s*\d{2}\.\d{2}\.\d{4}', first, re.M)
+        and re.search(r'Postavka\s+AOP\s+Podatek tekočega', first)
+    )
+
+def parse_podatek_tekocega_pdf(pages_text, tip_override=None, tip_subjekta_override=None):
+    result = ParseResult(pdf_format="PODATEK_TEKOCEGA_PDF")
+    first = pages_text[0] if pages_text else ""
+    is_ipi = bool(re.search(r'^\s*Izkaz poslovnega izida\s*$', first, re.M))
+    c = CompanyInfo()
+    m = re.search(r'^\s*Podjetje:\s*(.+?)\s*$', first, re.M)
+    if m:
+        c.name = m.group(1)
+    m = re.search(r'^\s*Davčna št\.:\s*(\d+)', first, re.M)
+    if m:
+        c.tax_number = m.group(1)
+    m = re.search(r'^\s*Za obdobje:\s*(\d{2}\.\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{2}\.\d{4})', first, re.M)
+    if m:
+        c.period_from, c.period_to = m.group(1), m.group(2)
+    c.tip_subjekta = "1"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override)
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+    result.warnings.append(
+        "Ta izpis ne vsebuje matične številke — vpiši jo ročno (D4) ali v polje Matična številka."
+    )
+    lo, hi = (110, 189) if is_ipi else (1, 96)
+    for page_text in pages_text:
+        for line in page_text.split('\n'):
+            if line.lstrip().startswith(('IZRAČUN', 'AKTIVA/PASIVA')):
+                continue
+            m = _JAT_ROW_RE.match(line)
+            if not m:
+                continue
+            n = int(m.group(1))
+            if not (lo <= n <= hi):
+                continue
+            aop = f"{n:03d}"
+            if aop in result.aop_data:
+                continue
+            val = parse_si(m.group(2))
+            if val is not None:
+                result.aop_data[aop] = AopEntry(aop=aop, current_year=val, previous_year=None)
+    return validate(result)
+
+
 def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
     pages_text = []
     pages_words = []
@@ -6356,6 +6409,8 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         fmt = "AJPES_MODUL_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_plan_1col_pdf(pages_text):
         fmt = "PLAN_1COL_PDF"
+    if fmt != "AJPES_MODUL_PDF" and _is_podatek_tekocega_pdf(pages_text):
+        fmt = "PODATEK_TEKOCEGA_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_vele_biro_ipi_pdf(pages_text):
         fmt = "VELE_BIRO_IPI_PDF"
     if fmt == "PLAIN_MST" and _is_sp_text_2col_pdf(pages_text):
@@ -6364,6 +6419,8 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         result = parse_vele_biro_ipi_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "SP_TEXT_2COL_PDF":
         result = parse_sp_text_2col_pdf(pages_text, tip_override, tip_subjekta_override)
+    elif fmt == "PODATEK_TEKOCEGA_PDF":
+        result = parse_podatek_tekocega_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "PLAN_1COL_PDF":
         result = parse_plan_1col_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "AJPES_MODUL_PDF":
