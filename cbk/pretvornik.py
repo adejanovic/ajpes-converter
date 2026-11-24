@@ -5060,7 +5060,8 @@ def _is_ajpes_portal_2col_pdf(pages_text):
     first = _dequad_text(pages_text[0])
     has_subject = "Ime poslovnega subjekta" in first
     has_title = bool(re.search(r'Podatki iz (bilance stanja|izkaza poslovnega izida)', first, re.I))
-    has_cols = ("Oznaka" in first and "za AOP" in first
+    # "Oznaka za AOP" je lahko razlomljena v tri vrstice (Oznaka / za / AOP), npr. PBI PRELOG
+    has_cols = ("Oznaka" in first and re.search(r'\bza\s+AOP\b', first) is not None
                 and "Tekočega leta" in first and "Prejšnjega leta" in first)
     # Uradni obrazec z dodatnim stolpcem "Konto" in 'Matična številka:NNN' v isti vrstici
     # (npr. FARMAKEM) ima svoj parser (URADNI, pozicijsko branje).
