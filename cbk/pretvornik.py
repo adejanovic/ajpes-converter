@@ -6383,6 +6383,62 @@ def parse_podatek_tekocega_pdf(pages_text, tip_override=None, tip_subjekta_overr
     return validate(result)
 
 
+# ── PARSER: PDF "PODATKI IZ BILANCE STANJA" / "PODATKI IZ IZKAZA POSLOVNEGA IZIDA" z glavo
+# (ime, Davčna številka, Matična številka) in stolpci Postavka | AOP (brez vodilnih ničel) | Tekoče leto
+# (npr. Pro Gourmet d.o.o.) ──
+_PODATKI_ROW_RE = re.compile(r'^\s*(?:.*?\s)?(\d{1,3})\s+(-?(?:\d{1,3}(?:\.\d{3})*|\d+)(?:,\d{2})?)\s*$')
+
+def _is_podatki_iz_pdf(pages_text):
+    first = pages_text[0] if pages_text else ""
+    return bool(
+        re.search(r'^\s*PODATKI IZ (?:BILANCE STANJA|IZKAZA POSLOVNEGA IZIDA)\s*$', first, re.M)
+        and re.search(r'Davčna številka\s*:\s*\d+', first)
+        and re.search(r'Matična številka\s*:\s*\d+', first)
+        and re.search(r'Postavka\s+AOP\s+Tekoče leto\s*$', first, re.M)
+    )
+
+def parse_podatki_iz_pdf(pages_text, tip_override=None, tip_subjekta_override=None):
+    result = ParseResult(pdf_format="PODATKI_IZ_PDF")
+    first = pages_text[0] if pages_text else ""
+    is_ipi = bool(re.search(r'^\s*PODATKI IZ IZKAZA POSLOVNEGA IZIDA\s*$', first, re.M))
+    c = CompanyInfo()
+    m = re.search(r'^\s*(.+?)\s+Davčna številka\s*:\s*(\d+)', first, re.M)
+    if m:
+        c.name, c.tax_number = m.group(1).strip(), m.group(2)
+    m = re.search(r'Matična številka\s*:\s*(\d+)', first)
+    if m:
+        c.registration_number = m.group(1)
+    m = re.search(r'od\s+(\d{2}\.\d{2}\.\d{4})\s+do\s+(\d{2}\.\d{2}\.\d{4})', first)
+    if m:
+        c.period_from, c.period_to = m.group(1), m.group(2)
+    else:
+        m = re.search(r'na dan\s+(\d{2}\.\d{2}\.\d{4})', first)
+        if m:
+            c.period_to = m.group(1)
+    c.tip_subjekta = "1"
+    result.company = finalize_company(c, tip_override, tip_subjekta_override)
+    result.subject_type = _subject_type_from_tip_subjekta(result.company.tip_subjekta)
+    lo, hi = (110, 189) if is_ipi else (1, 96)
+    for page_text in pages_text:
+        for line in page_text.split('\n'):
+            m = _PODATKI_ROW_RE.match(line)
+            if not m:
+                continue
+            n = int(m.group(1))
+            amt = m.group(2)
+            if not (lo <= n <= hi or (not is_ipi and n == 301)):
+                continue
+            if ',' not in amt and n not in (188, 189):
+                continue
+            aop = f"{n:03d}"
+            if aop in result.aop_data:
+                continue
+            val = parse_si(amt)
+            if val is not None:
+                result.aop_data[aop] = AopEntry(aop=aop, current_year=val, previous_year=None)
+    return validate(result)
+
+
 def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
     pages_text = []
     pages_words = []
@@ -6409,6 +6465,8 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         fmt = "AJPES_MODUL_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_plan_1col_pdf(pages_text):
         fmt = "PLAN_1COL_PDF"
+    if fmt != "AJPES_MODUL_PDF" and _is_podatki_iz_pdf(pages_text):
+        fmt = "PODATKI_IZ_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_podatek_tekocega_pdf(pages_text):
         fmt = "PODATEK_TEKOCEGA_PDF"
     if fmt != "AJPES_MODUL_PDF" and _is_vele_biro_ipi_pdf(pages_text):
@@ -6419,6 +6477,8 @@ def parse_pdf_file(pdf_path, tip_override=None, tip_subjekta_override=None):
         result = parse_vele_biro_ipi_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "SP_TEXT_2COL_PDF":
         result = parse_sp_text_2col_pdf(pages_text, tip_override, tip_subjekta_override)
+    elif fmt == "PODATKI_IZ_PDF":
+        result = parse_podatki_iz_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "PODATEK_TEKOCEGA_PDF":
         result = parse_podatek_tekocega_pdf(pages_text, tip_override, tip_subjekta_override)
     elif fmt == "PLAN_1COL_PDF":
